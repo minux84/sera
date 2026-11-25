@@ -29,7 +29,16 @@ typedef struct {
     long long queue_total;
     int queue_min;
     int queue_max;
+    // Continuous silent audio keeps the NDL v2 audio master clock running.
+    long long audio_pts_ms;
+    long long video_max_ms;
+    unsigned long audio_fed;
+    unsigned long audio_backpressure;
 } LumaNDL;
+// One 20ms stereo CELT fullband silence frame (TOC config 31, stereo).
+static const unsigned char silent_opus_20ms[3]={0xfc,0xff,0xfe};
+// Keep audio at most this far ahead of the newest video PTS.
+#define AUDIO_AHEAD_MS 40
 static LumaNDL *active=NULL;
 static void record(const char *label,int64_t value) {
     FILE *f=fopen("/media/developer/com.denisefremov.luma/luma-ndl-events.log","a");
@@ -93,6 +102,7 @@ void *luma_hw_open(const char *app_id,int width,int height,const char *codec) {
         if(result==0)prime_ok++;
     }
     record("AUDIO_PRIME_ACCEPTED",prime_ok);
+    p->audio_pts_ms=40;
     // NDL v2 self-sizes the hardware video punch-through plane.
     // DirectVideoSetArea is v1-only; on v2 it causes stutter above 1080p.
     record("LOAD_OK",info.video.type);
@@ -108,6 +118,24 @@ int luma_hw_feed(void *opaque,const void *buffer,size_t size,int64_t pts_ns) {
     int result=NDL_DirectVideoPlay((void*)buffer,(unsigned int)size,pts_ns/1000000);
     if(result==0){
         __atomic_add_fetch(&p->fed,1,__ATOMIC_RELEASE);
+        // Without audio after the 40ms prime, the audio master clock stalls
+        // and video presentation judders. Feed silence up to the newest video
+        // PTS (B-frame PTS is non-monotonic, so track the maximum).
+        long long video_ms=pts_ns/1000000;
+        if(video_ms>p->video_max_ms)p->video_max_ms=video_ms;
+        while(p->audio_pts_ms<=p->video_max_ms+AUDIO_AHEAD_MS){
+            if(NDL_DirectAudioPlay((void*)silent_opus_20ms,sizeof(silent_opus_20ms),
+                                   p->audio_pts_ms)!=0){
+                p->audio_backpressure++;
+                break;
+            }
+            p->audio_fed++;
+            p->audio_pts_ms+=20;
+        }
+        if(p->fed==1 || p->fed%300==0){
+            record("AUDIO_FED",(int64_t)p->audio_fed);
+            record("AUDIO_BACKPRESSURE",(int64_t)p->audio_backpressure);
+        }
         // Sample rendering backlog at a low rate: diagnostic only.
         if(p->fed%5==0){
             int queued=-1;
