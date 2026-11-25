@@ -2267,7 +2267,7 @@ fn settings_preview_illustrations_stay_in_panel_with_centered_copy() {
     for (section, name, summary) in [
         (0, "General", "Language, clock and motion"),
         (1, "Wallpaper", "Video wallpaper collection"),
-        (2, "Widgets", "Weather, crypto, HDMI and Smart Home on Home"),
+        (2, "Widgets", "Weather, air, crypto, HDMI and Smart Home"),
         (3, "Inputs", "Connected HDMI devices"),
         (4, "Smart Home", "Home Assistant devices"),
         (5, "System", "Device and launcher controls"),

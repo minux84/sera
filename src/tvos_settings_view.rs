@@ -503,7 +503,7 @@ fn root(out: &mut Scene, state: &State, assets: &Assets) {
     let hints = [
         "Language, clock and motion",
         "Video wallpaper collection",
-        "Weather, crypto, HDMI and Smart Home on Home",
+        "Weather, air, crypto, HDMI and Smart Home",
         "Connected HDMI devices",
         "Home Assistant devices",
         "Device and launcher controls",

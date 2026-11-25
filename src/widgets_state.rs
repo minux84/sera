@@ -5,11 +5,14 @@ use crate::{
     smart_home::Entity,
     state::{Control, Direction, Effect, Page, SettingsLevel, State, Target, WEATHER_SECTION},
     widgets::{
-        Block, COINS, Detail, Edit, Exchange, Grab, Kind, Period, QUOTES, REFRESH_CHOICES,
+        Block, COINS, Detail, Edit, Exchange, Grab, Kind, Period, QUOTES, REFRESH_CHOICES, Scale,
         SettingsPage, Size, TEXT_MAX, ZONE_COLUMNS,
     },
 };
 use std::time::Instant;
+
+/// Widgets that have a text-line form, in Settings › Widgets › Text line.
+const TEXT_KINDS: [Kind; 4] = [Kind::Weather, Kind::Air, Kind::Crypto, Kind::Smart];
 
 /// One row of a Settings › Widgets page.
 pub struct Row {
@@ -440,6 +443,12 @@ impl State {
             Target::WidgetTab(i) => {
                 match self.widget_detail.as_mut()? {
                     Detail::Weather { tab } => *tab = i,
+                    Detail::Air => {
+                        if let Some(scale) = Scale::ALL.get(i) {
+                            self.preferences.widgets.air_scale = *scale;
+                            return Some(self.widget_save());
+                        }
+                    }
                     Detail::Crypto { .. } => {
                         if let Some(p) = Period::ALL.get(i) {
                             self.preferences.widgets.period = *p;
@@ -505,7 +514,7 @@ impl State {
     fn open_widget(&mut self, kind: Kind, size: Size) -> Vec<Effect> {
         let back = self.focus.clone();
         match kind {
-            Kind::Weather => {
+            Kind::Weather | Kind::Air => {
                 if self.preferences.weather_location.is_none() {
                     self.open_settings();
                     self.section = WEATHER_SECTION;
@@ -513,8 +522,16 @@ impl State {
                     self.change_focus(Target::WeatherLocation);
                     return vec![];
                 }
-                self.widget_detail = Some(Detail::Weather { tab: 0 });
-                self.change_focus(Target::WidgetTab(0));
+                if kind == Kind::Weather {
+                    self.widget_detail = Some(Detail::Weather { tab: 0 });
+                    self.change_focus(Target::WidgetTab(0));
+                } else {
+                    let scale = self.preferences.widgets.air_scale;
+                    self.widget_detail = Some(Detail::Air);
+                    self.change_focus(Target::WidgetTab(
+                        Scale::ALL.iter().position(|s| *s == scale).unwrap_or(0),
+                    ));
+                }
             }
             Kind::Crypto => {
                 self.widget_detail = Some(Detail::Crypto { coin: 0 });
@@ -609,9 +626,10 @@ impl State {
             }
             P::Text => (P::Root, 1),
             P::Add => (P::Root, 2),
-            P::Crypto => (P::Root, 4),
-            P::Hdmi => (P::Root, 5),
-            P::Smart => (P::Root, 6),
+            P::Air => (P::Root, 4),
+            P::Crypto => (P::Root, 5),
+            P::Hdmi => (P::Root, 6),
+            P::Smart => (P::Root, 7),
             P::Exchange => (P::Crypto, 0),
             P::Coins => (P::Crypto, 1),
             P::MainCoin => (P::Crypto, 2),
@@ -782,6 +800,12 @@ impl State {
                     row("Add widget", None, true, false),
                     row("Weather", Some(city), true, false),
                     row(
+                        "Air quality",
+                        Some(prefs.air_scale.title().into()),
+                        true,
+                        false,
+                    ),
+                    row(
                         "Crypto",
                         Some(format!(
                             "{} · {}",
@@ -803,13 +827,17 @@ impl State {
                 rows.push(row("Add to Home", None, false, false));
                 rows
             }
-            P::Text => [Kind::Weather, Kind::Crypto, Kind::Smart]
+            P::Text => TEXT_KINDS
                 .iter()
                 .map(|k| {
                     let mut r = check(k.title(), prefs.text.contains(k));
                     r.dim = !prefs.text.contains(k) && prefs.text.len() >= TEXT_MAX;
                     r
                 })
+                .collect(),
+            P::Air => Scale::ALL
+                .iter()
+                .map(|scale| check(scale.title(), prefs.air_scale == *scale))
                 .collect(),
             P::Crypto => vec![
                 row("Exchange", Some(prefs.exchange.short().into()), true, false),
@@ -1060,9 +1088,10 @@ impl State {
                     self.settings_push(SettingsLevel::Section, Target::WeatherToggle);
                     vec![]
                 }
-                4 => push(self, P::Crypto, 0),
-                5 => push(self, P::Hdmi, 0),
-                6 => push(self, P::Smart, 0),
+                4 => push(self, P::Air, 0),
+                5 => push(self, P::Crypto, 0),
+                6 => push(self, P::Hdmi, 0),
+                7 => push(self, P::Smart, 0),
                 _ => vec![],
             },
             P::Add => {
@@ -1112,12 +1141,16 @@ impl State {
                 self.widget_save()
             }
             P::Text => {
-                let kind = [Kind::Weather, Kind::Crypto, Kind::Smart][i.min(2)];
+                let kind = TEXT_KINDS[i.min(TEXT_KINDS.len() - 1)];
                 if let Some(at) = prefs.text.iter().position(|k| *k == kind) {
                     prefs.text.remove(at);
                 } else if prefs.text.len() < TEXT_MAX {
                     prefs.text.push(kind);
                 }
+                self.widget_save()
+            }
+            P::Air => {
+                prefs.air_scale = Scale::ALL[i.min(Scale::ALL.len() - 1)];
                 self.widget_save()
             }
             P::Crypto => push(

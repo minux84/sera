@@ -1,5 +1,6 @@
 //! Home widgets: the layout preferences, the grid math and the background
-//! data they show (extended Open-Meteo forecast, public crypto prices).
+//! data they show (extended Open-Meteo forecast and air quality, public
+//! crypto prices).
 //! No request runs on the SDL thread; workers hand results over a channel.
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -29,15 +30,23 @@ pub fn inner_radius(outer: f32, padding: f32) -> f32 {
 #[serde(rename_all = "lowercase")]
 pub enum Kind {
     Weather,
+    Air,
     Crypto,
     Hdmi,
     Smart,
 }
 impl Kind {
-    pub const ALL: [Self; 4] = [Self::Weather, Self::Crypto, Self::Hdmi, Self::Smart];
+    pub const ALL: [Self; 5] = [
+        Self::Weather,
+        Self::Air,
+        Self::Crypto,
+        Self::Hdmi,
+        Self::Smart,
+    ];
     pub fn title(self) -> &'static str {
         match self {
             Self::Weather => "Weather",
+            Self::Air => "Air quality",
             Self::Crypto => "Crypto",
             Self::Hdmi => "HDMI input",
             Self::Smart => "Smart Home",
@@ -185,6 +194,77 @@ pub fn coin(symbol: &str) -> (&'static str, u32, &'static str) {
 pub const QUOTES: [&str; 3] = ["USD", "EUR", "USDT"];
 pub const REFRESH_CHOICES: [u32; 4] = [15, 30, 60, 300];
 
+/// Air quality index the widgets show.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Scale {
+    /// European AQI (EEA), 0–100+.
+    #[default]
+    European,
+    /// US AQI (EPA), 0–500.
+    Us,
+}
+impl Scale {
+    pub const ALL: [Self; 2] = [Self::European, Self::Us];
+    pub fn title(self) -> &'static str {
+        match self {
+            Self::European => "European AQI",
+            Self::Us => "US AQI",
+        }
+    }
+    /// Band 0 (good) to 5 (worst) for an index on this scale.
+    pub fn band(self, index: f64) -> usize {
+        let limits: [f64; 5] = match self {
+            Self::European => [20., 40., 60., 80., 100.],
+            Self::Us => [50., 100., 150., 200., 300.],
+        };
+        limits.iter().take_while(|l| index > **l).count()
+    }
+    pub fn word(self, index: f64) -> &'static str {
+        let words = match self {
+            Self::European => [
+                "Good",
+                "Fair",
+                "Moderate",
+                "Poor",
+                "Very poor",
+                "Extremely poor",
+            ],
+            Self::Us => [
+                "Good",
+                "Moderate",
+                "Unhealthy for some",
+                "Unhealthy",
+                "Very unhealthy",
+                "Hazardous",
+            ],
+        };
+        words[self.band(index)]
+    }
+}
+/// Band colours, good to worst.
+pub const AIR_COLORS: [u32; 6] = [0x8fe3a8, 0xd2e88f, 0xf2d46b, 0xffa98f, 0xff7b7b, 0xc99bff];
+/// One sentence for a band.
+pub fn air_advice(band: usize) -> &'static str {
+    [
+        "Air is clean. A good time to open the windows.",
+        "Air is fine for almost everyone.",
+        "Sensitive people may want to keep outdoor effort short.",
+        "Limit long outdoor effort; keep windows closed at peak hours.",
+        "Avoid outdoor effort and keep windows closed.",
+        "Stay indoors and keep windows closed.",
+    ][band.min(5)]
+}
+/// Pollen in grains/m³: none, low, moderate, high.
+pub fn pollen_word(grains: f64) -> &'static str {
+    match grains {
+        g if g < 1. => "None",
+        g if g < 20. => "Low",
+        g if g < 80. => "Moderate",
+        _ => "High",
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct WidgetPrefs {
@@ -198,6 +278,7 @@ pub struct WidgetPrefs {
     pub quote: String,
     pub period: Period,
     pub refresh_seconds: u32,
+    pub air_scale: Scale,
     /// HDMI M widget input id; empty = the first connected input.
     pub hdmi_input: String,
     pub hdmi_live: bool,
@@ -229,6 +310,7 @@ impl Default for WidgetPrefs {
             quote: "USD".into(),
             period: Period::Day,
             refresh_seconds: 30,
+            air_scale: Scale::European,
             hdmi_input: String::new(),
             hdmi_live: true,
             hdmi_hide_no_signal: false,
@@ -331,6 +413,8 @@ pub fn layout(blocks: &[Block], has_text: bool, pitch: f32, tile: f32, strip_rig
 pub enum Detail {
     /// 0 today, 1 tomorrow, 2 ten days.
     Weather { tab: usize },
+    /// Tabs pick the index scale.
+    Air,
     /// Index into `WidgetPrefs::ordered_coins`.
     Crypto { coin: usize },
 }
@@ -354,6 +438,7 @@ pub enum SettingsPage {
     Root,
     Add,
     Text,
+    Air,
     Crypto,
     Exchange,
     Coins,
@@ -370,6 +455,59 @@ pub enum SettingsPage {
 }
 
 // ---------------------------------------------------------------- data
+
+/// Pollen types Open-Meteo reports (Europe only): (API field, name).
+pub const POLLEN: [(&str, &str); 6] = [
+    ("grass_pollen", "Grass"),
+    ("birch_pollen", "Birch"),
+    ("alder_pollen", "Alder"),
+    ("olive_pollen", "Olive"),
+    ("mugwort_pollen", "Mugwort"),
+    ("ragweed_pollen", "Ragweed"),
+];
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Air {
+    pub key: String,
+    pub european: f64,
+    pub us: f64,
+    /// μg/m³; NaN when the model has no value.
+    pub pm2_5: f64,
+    pub pm10: f64,
+    pub no2: f64,
+    pub ozone: f64,
+    /// Grains/m³ in `POLLEN` order; empty outside Europe.
+    pub pollen: Vec<f64>,
+    /// Next 24 hours from now: (hour, European AQI, US AQI).
+    pub hours: Vec<(u8, f64, f64)>,
+}
+impl Air {
+    pub fn index(&self, scale: Scale) -> f64 {
+        match scale {
+            Scale::European => self.european,
+            Scale::Us => self.us,
+        }
+    }
+    /// Hourly index on `scale`, for the chart.
+    pub fn series(&self, scale: Scale) -> Vec<f64> {
+        self.hours
+            .iter()
+            .map(|h| match scale {
+                Scale::European => h.1,
+                Scale::Us => h.2,
+            })
+            .collect()
+    }
+    /// The strongest pollen right now: (name, grains/m³), if any.
+    pub fn top_pollen(&self) -> Option<(&'static str, f64)> {
+        self.pollen
+            .iter()
+            .zip(POLLEN)
+            .map(|(g, (_, name))| (name, *g))
+            .filter(|(_, g)| *g >= 1.)
+            .max_by(|a, b| a.1.total_cmp(&b.1))
+    }
+}
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Quote {
@@ -430,9 +568,13 @@ pub struct Data {
     pub quotes_for: Option<(Exchange, String, Period)>,
     pub quotes_at: Option<Instant>,
     pub quotes_failed: bool,
+    pub air: Option<Air>,
+    pub air_at: Option<Instant>,
+    pub air_failed: bool,
     pub forecast: Option<Forecast>,
     pub forecast_at: Option<Instant>,
     pending_quotes: bool,
+    pending_air: bool,
     pending_forecast: bool,
 }
 impl Data {
@@ -448,6 +590,11 @@ pub enum Job {
         period: Period,
         coins: Vec<String>,
     },
+    Air {
+        key: String,
+        latitude: f64,
+        longitude: f64,
+    },
     Forecast {
         key: String,
         latitude: f64,
@@ -456,6 +603,7 @@ pub enum Job {
 }
 pub enum Result {
     Quotes(Exchange, String, Period, Option<Vec<Quote>>),
+    Air(Option<Air>),
     Forecast(Option<Forecast>),
 }
 
@@ -491,6 +639,11 @@ pub fn service() -> &'static Service {
                         }
                         Result::Quotes(exchange, quote, period, (!list.is_empty()).then_some(list))
                     }
+                    Job::Air {
+                        key,
+                        latitude,
+                        longitude,
+                    } => Result::Air(fetch_air(&agent, &key, latitude, longitude)),
                     Job::Forecast {
                         key,
                         latitude,
@@ -535,6 +688,14 @@ pub fn tick(
                     }
                     data.quotes_at = Some(Instant::now());
                 }
+                Result::Air(air) => {
+                    data.pending_air = false;
+                    data.air_at = Some(Instant::now());
+                    data.air_failed = air.is_none();
+                    if air.is_some() {
+                        data.air = air;
+                    }
+                }
                 Result::Forecast(forecast) => {
                     data.pending_forecast = false;
                     data.forecast_at = Some(Instant::now());
@@ -566,6 +727,28 @@ pub fn tick(
             period: prefs.period,
             coins: prefs.ordered_coins(),
         });
+    }
+    if let Some(place) = location
+        && (prefs.uses(Kind::Air) || detail_open)
+        && !data.pending_air
+    {
+        let key = place.key();
+        // A new place soon; otherwise the hourly model, every 30 minutes.
+        let stale = data.air.as_ref().is_none_or(|a| a.key != key)
+            && data
+                .air_at
+                .is_none_or(|at| at.elapsed() >= Duration::from_secs(60))
+            || data
+                .air_at
+                .is_none_or(|at| at.elapsed() >= Duration::from_secs(30 * 60));
+        if stale {
+            data.pending_air = true;
+            let _ = service().jobs.send(Job::Air {
+                key,
+                latitude: place.latitude,
+                longitude: place.longitude,
+            });
+        }
     }
     if let Some(place) = location
         && (prefs.uses(Kind::Weather) || detail_open)
@@ -814,6 +997,62 @@ pub fn quote_from_series(symbol: &str, series: Vec<f64>) -> Option<Quote> {
     })
 }
 
+fn fetch_air(agent: &ureq::Agent, key: &str, latitude: f64, longitude: f64) -> Option<Air> {
+    let pollen: Vec<&str> = POLLEN.iter().map(|p| p.0).collect();
+    let url = format!(
+        "https://air-quality-api.open-meteo.com/v1/air-quality?latitude={latitude}&longitude={longitude}\
+&current=european_aqi,us_aqi,pm2_5,pm10,nitrogen_dioxide,ozone,{}\
+&hourly=european_aqi,us_aqi&forecast_days=2&timezone=auto",
+        pollen.join(",")
+    );
+    parse_air(key, &get_json(agent, &url)?)
+}
+pub fn parse_air(key: &str, v: &Value) -> Option<Air> {
+    let c = &v["current"];
+    let value = |name: &str| num(&c[name]).unwrap_or(f64::NAN);
+    let european = num(&c["european_aqi"])?;
+    let us = num(&c["us_aqi"]).unwrap_or(f64::NAN);
+    let now = c["time"].as_str().and_then(|t| t.get(..13)).unwrap_or("");
+    let h = &v["hourly"];
+    let mut hours = Vec::new();
+    for (i, t) in h["time"].as_array()?.iter().enumerate() {
+        let Some(t) = t.as_str() else { continue };
+        if t.get(..13).is_some_and(|x| x < now) {
+            continue;
+        }
+        let (Some(hour), Some(eu)) = (
+            t.get(11..13).and_then(|x| x.parse().ok()),
+            num(&h["european_aqi"][i]),
+        ) else {
+            continue;
+        };
+        hours.push((hour, eu, num(&h["us_aqi"][i]).unwrap_or(f64::NAN)));
+        if hours.len() == 24 {
+            break;
+        }
+    }
+    let pollen: Vec<f64> = POLLEN.iter().map(|p| value(p.0)).collect();
+    Some(Air {
+        key: key.into(),
+        european,
+        us,
+        pm2_5: value("pm2_5"),
+        pm10: value("pm10"),
+        no2: value("nitrogen_dioxide"),
+        ozone: value("ozone"),
+        // Outside Europe every pollen value is null.
+        pollen: if pollen.iter().all(|g| g.is_nan()) {
+            vec![]
+        } else {
+            pollen
+                .into_iter()
+                .map(|g| if g.is_nan() { 0. } else { g })
+                .collect()
+        },
+        hours,
+    })
+}
+
 fn fetch_forecast(
     agent: &ureq::Agent,
     key: &str,
@@ -1015,6 +1254,11 @@ mod tests {
                 .unwrap();
         assert_eq!(p.blocks[0].size, Size::L);
         assert_eq!(p.period, Period::Week);
+        assert_eq!(p.blocks[0].kind, Kind::Crypto);
+        let p: WidgetPrefs =
+            serde_json::from_str(r#"{"blocks":[{"kind":"air","size":"m"}],"air_scale":"us"}"#)
+                .unwrap();
+        assert_eq!((p.blocks[0].kind, p.air_scale), (Kind::Air, Scale::Us));
     }
     #[test]
     fn prices_and_changes_read_like_the_mockup() {
@@ -1026,6 +1270,43 @@ mod tests {
         let q = quote_from_series("BTC", vec![100., 110., 105.]).unwrap();
         assert!((q.change_pct - 5.).abs() < 1e-9);
         assert_eq!((q.high, q.low), (110., 100.));
+    }
+    #[test]
+    fn air_bands_follow_each_scale() {
+        assert_eq!(Scale::European.band(20.), 0);
+        assert_eq!(Scale::European.band(29.), 1);
+        assert_eq!(Scale::European.word(65.), "Poor");
+        assert_eq!(Scale::European.band(140.), 5);
+        assert_eq!(Scale::Us.band(44.), 0);
+        assert_eq!(Scale::Us.word(120.), "Unhealthy for some");
+        assert_eq!(Scale::Us.band(350.), 5);
+        assert_eq!(pollen_word(0.), "None");
+        assert_eq!(pollen_word(45.), "Moderate");
+    }
+    #[test]
+    fn air_parses_open_meteo_payload() {
+        let v: Value = serde_json::json!({
+            "current": {"time": "2026-11-25T17:00", "european_aqi": 29, "us_aqi": 44,
+                "pm2_5": 3.5, "pm10": 8.9, "nitrogen_dioxide": 6.8, "ozone": 77.0,
+                "grass_pollen": 12.0, "birch_pollen": 30.5, "alder_pollen": null},
+            "hourly": {"time": ["2026-11-25T16:00", "2026-11-25T17:00", "2026-11-25T18:00"],
+                "european_aqi": [25, 29, 33], "us_aqi": [40, 44, null]}
+        });
+        let a = parse_air("k", &v).unwrap();
+        assert_eq!((a.european, a.us), (29., 44.));
+        assert_eq!(a.hours.len(), 2);
+        assert_eq!(a.hours[0], (17, 29., 44.));
+        assert!(a.hours[1].2.is_nan());
+        assert_eq!(a.series(Scale::European), vec![29., 33.]);
+        assert_eq!(a.top_pollen(), Some(("Birch", 30.5)));
+        assert_eq!(a.pollen.len(), POLLEN.len());
+        // Outside Europe: no pollen at all.
+        let v: Value = serde_json::json!({
+            "current": {"time": "2026-11-25T17:00", "european_aqi": 10, "us_aqi": 20},
+            "hourly": {"time": [], "european_aqi": [], "us_aqi": []}
+        });
+        let a = parse_air("k", &v).unwrap();
+        assert!(a.pollen.is_empty() && a.top_pollen().is_none());
     }
     #[test]
     fn forecast_parses_open_meteo_payload() {

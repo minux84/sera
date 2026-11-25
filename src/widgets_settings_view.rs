@@ -83,7 +83,7 @@ pub(super) fn preview(
     let (name, detail): (String, String) = match page {
         None | Some(P::Root) => (
             "Widgets".into(),
-            "Weather, crypto, HDMI and Smart Home on Home".into(),
+            "Weather, air, crypto, HDMI and Smart Home".into(),
         ),
         Some(P::Add) => {
             let (kind, size) = state.widget_add;
@@ -106,6 +106,10 @@ pub(super) fn preview(
             )
         }
         Some(P::Text) => ("Text line".into(), "Up to three short widgets".into()),
+        Some(P::Air) => (
+            "Air quality".into(),
+            format!("{} · Open-Meteo", prefs.air_scale.title()),
+        ),
         Some(P::Hdmi | P::HdmiInput) => (
             "HDMI input".into(),
             "OK on the widget switches to the input".into(),
@@ -141,6 +145,13 @@ pub(super) fn preview(
             Vec::new(),
         ),
         Some(P::SmartSensor) => (Vec::new(), vec![Kind::Smart]),
+        Some(P::Air) => (
+            vec![Block {
+                kind: Kind::Air,
+                size: Size::M,
+            }],
+            Vec::new(),
+        ),
         Some(_) => (
             vec![Block {
                 kind: Kind::Crypto,
@@ -171,7 +182,7 @@ pub(super) fn preview(
     } else {
         widgets_picture(out, state, assets, &blocks, &line, area);
     }
-    // Weather and crypto move, so the preview is never cached as static.
+    // Weather, air quality and crypto move, so the preview is never cached as static.
     out.settings_sidebar_key = 0x5749_4447_0000 + page.map_or(0, |p| p as u64 + 1);
     let text_w = LEFT_W - 2. * S24;
     out.text(

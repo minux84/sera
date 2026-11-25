@@ -51,6 +51,7 @@ fn width(assets: &Assets, value: &str, style: TextStyle) -> f32 {
 pub(super) fn available(state: &State, kind: Kind) -> bool {
     match kind {
         Kind::Weather => state.preferences.show_weather,
+        Kind::Air => state.preferences.weather_location.is_some(),
         Kind::Crypto => true,
         Kind::Hdmi => !state.inventory.inputs.is_empty(),
         Kind::Smart => !state.preferences.smart_home.server_url.is_empty(),
@@ -174,6 +175,10 @@ pub(super) fn block(
     let whole = match b.kind {
         Kind::Weather => {
             weather_block(out, state, assets, b.size, r);
+            true
+        }
+        Kind::Air => {
+            air_block(out, state, assets, b.size, r);
             true
         }
         Kind::Crypto => {
@@ -647,6 +652,256 @@ fn days(
     }
 }
 
+// ------------------------------------------------------------- air quality
+
+/// Air data for the saved place, if it has arrived.
+fn air(state: &State) -> Option<&w::Air> {
+    let key = state.preferences.weather_location.as_ref()?.key();
+    state.widget_data.air.as_ref().filter(|a| a.key == key)
+}
+fn air_status(state: &State) -> &'static str {
+    if state.preferences.weather_location.is_none() {
+        "Set weather location"
+    } else if state.widget_data.air_failed {
+        "Air data unavailable"
+    } else {
+        "Loading air quality"
+    }
+}
+/// (index text, band, band colour) on the chosen scale.
+fn air_reading(state: &State, a: &w::Air) -> (String, usize, u32) {
+    let scale = state.preferences.widgets.air_scale;
+    let index = a.index(scale);
+    if !index.is_finite() {
+        return ("—".into(), 0, 0xffffff);
+    }
+    let band = scale.band(index);
+    (format!("{index:.0}"), band, w::AIR_COLORS[band])
+}
+fn air_word(state: &State, a: &w::Air) -> &'static str {
+    let scale = state.preferences.widgets.air_scale;
+    let index = a.index(scale);
+    if index.is_finite() {
+        scale.word(index)
+    } else {
+        "No data"
+    }
+}
+/// The index for the next hours, gaps dropped.
+fn air_series(state: &State, a: &w::Air) -> Vec<f64> {
+    a.series(state.preferences.widgets.air_scale)
+        .into_iter()
+        .filter(|v| v.is_finite())
+        .collect()
+}
+/// Pollutants for the lists: (label, µg/m³ text).
+fn pollutants(a: &w::Air) -> [(&'static str, String); 4] {
+    let v = |x: f64| {
+        if x.is_finite() {
+            format!("{x:.0} µg/m³")
+        } else {
+            "—".into()
+        }
+    };
+    [
+        ("PM2.5", v(a.pm2_5)),
+        ("PM10", v(a.pm10)),
+        ("NO2", v(a.no2)),
+        ("Ozone", v(a.ozone)),
+    ]
+}
+/// Six band segments; the current one full, the others faint.
+fn band_bar(out: &mut Scene, r: Rect, band: usize) {
+    let gap = 4.;
+    let seg = (r.w - gap * 5.) / 6.;
+    for (k, color) in w::AIR_COLORS.iter().enumerate() {
+        out.shape(
+            Rect::new(r.x + k as f32 * (seg + gap), r.y, seg, r.h),
+            r.h / 2.,
+            c(*color, if k == band { 1. } else { 0.28 }),
+        );
+    }
+}
+fn air_title(out: &mut Scene, assets: &Assets, x: f32, y: f32, max: f32) {
+    out.icon(
+        assets,
+        "air",
+        Rect::new(x, y + 2., 26., 26.),
+        c(0xffffff, 0.9),
+    );
+    out.text(
+        "Air quality",
+        Rect::new(x + 36., y, max - 36., 30.),
+        ts(assets, 22., 600),
+        WHITE,
+        false,
+    );
+}
+/// Rows of label and value, evenly spread over `r`.
+fn air_rows(out: &mut Scene, assets: &Assets, rows: &[(&str, String)], r: Rect) {
+    let n = rows.len().max(1) as f32;
+    let row = r.h / n;
+    for (k, (label, value)) in rows.iter().enumerate() {
+        let y = r.y + k as f32 * row;
+        if k > 0 {
+            out.shape(Rect::new(r.x, y, r.w, 1.), 0., c(0xffffff, 0.08));
+        }
+        let mid = y + row / 2.;
+        out.text(
+            *label,
+            Rect::new(r.x, mid - 14., r.w / 2., 28.),
+            ts(assets, 20., 500),
+            c(0xffffff, 0.7),
+            false,
+        );
+        out.text(
+            value,
+            Rect::new(r.x + r.w / 2., mid - 15., r.w / 2., 30.),
+            ts(assets, 22., 600).right(),
+            WHITE,
+            false,
+        );
+    }
+}
+fn air_block(out: &mut Scene, state: &State, assets: &Assets, size: Size, r: Rect) {
+    out.glass(r, RADIUS);
+    let Some(a) = air(state) else {
+        air_title(out, assets, r.x + 22., r.y + 22., r.w - 44.);
+        out.text(
+            air_status(state),
+            Rect::new(r.x + 22., r.y + 80., r.w - 44., 30.),
+            ts(assets, 20., 500),
+            c(0xffffff, 0.7),
+            false,
+        );
+        return;
+    };
+    let (value, band, color) = air_reading(state, a);
+    let word = air_word(state, a);
+    let series = air_series(state, a);
+    match size {
+        Size::S => {
+            air_title(out, assets, r.x + 22., r.y + 22., r.w - 44.);
+            out.text(
+                &value,
+                Rect::new(r.x + 22., r.y + 62., r.w - 44., 84.),
+                td(assets, 72.),
+                WHITE,
+                false,
+            );
+            let style = ts(assets, 22., 600);
+            out.text(
+                clip_weather_line(word, r.w - 44., style, assets),
+                Rect::new(r.x + 22., r.y + 148., r.w - 44., 30.),
+                style,
+                c(color, 1.),
+                false,
+            );
+            sparkline(
+                out,
+                &series,
+                Rect::new(r.x + 22., r.y + r.h - 18. - 100., r.w - 44., 94.),
+                color,
+                3.,
+                true,
+                true,
+            );
+        }
+        Size::M => {
+            let left = Rect::new(r.x + 24., r.y + 22., 236., r.h - 44.);
+            air_title(out, assets, left.x, left.y, left.w);
+            out.text(
+                &value,
+                Rect::new(left.x, left.y + 44., left.w, 100.),
+                td(assets, 88.),
+                WHITE,
+                false,
+            );
+            let style = ts(assets, 24., 600);
+            out.text(
+                clip_weather_line(word, left.w, style, assets),
+                Rect::new(left.x, left.y + 146., left.w, 32.),
+                style,
+                c(color, 1.),
+                false,
+            );
+            city_line(out, state, assets, left.x, left.y + 190., left.w, 18.);
+            band_bar(
+                out,
+                Rect::new(left.x, left.y + left.h - 10., left.w, 10.),
+                band,
+            );
+            let x = left.x + left.w + 24.;
+            out.shape(
+                Rect::new(x, r.y + 22., 1., r.h - 44.),
+                0.,
+                c(0xffffff, 0.08),
+            );
+            let list = Rect::new(x + 24., r.y + 14., r.x + r.w - 24. - x - 24., r.h - 28.);
+            air_rows(out, assets, &pollutants(a), list);
+        }
+        _ => {
+            let left = Rect::new(r.x + 24., r.y + 22., 520., r.h - 44.);
+            air_title(out, assets, left.x, left.y, 260.);
+            city_line(out, state, assets, left.x + 260., left.y + 4., 260., 18.);
+            let big = td(assets, 56.);
+            out.text(
+                &value,
+                Rect::new(left.x, left.y + 42., 200., 68.),
+                big,
+                WHITE,
+                false,
+            );
+            let vw = width(assets, &value, big);
+            out.text(
+                word,
+                Rect::new(left.x + vw + 16., left.y + 64., left.w - vw - 16., 32.),
+                ts(assets, 24., 600),
+                c(color, 1.),
+                false,
+            );
+            out.text(
+                "Next 24 hours",
+                Rect::new(left.x, left.y + 118., left.w, 25.),
+                ts(assets, 18., 500).tracking(0.03),
+                c(0xffffff, 0.6),
+                false,
+            );
+            sparkline(
+                out,
+                &series,
+                Rect::new(left.x, left.y + 150., left.w, left.h - 172.),
+                color,
+                3.,
+                true,
+                true,
+            );
+            band_bar(
+                out,
+                Rect::new(left.x, left.y + left.h - 10., left.w, 10.),
+                band,
+            );
+            let x = left.x + left.w + 24.;
+            out.shape(
+                Rect::new(x, r.y + 22., 1., r.h - 44.),
+                0.,
+                c(0xffffff, 0.08),
+            );
+            let list = Rect::new(x + 24., r.y + 14., r.x + r.w - 24. - x - 24., r.h - 28.);
+            let mut rows: Vec<(&str, String)> = pollutants(a).to_vec();
+            if let Some((name, grains)) = a.top_pollen() {
+                rows.push((name, w::pollen_word(grains).into()));
+            }
+            air_rows(out, assets, &rows, list);
+        }
+    }
+}
+
+/// Top of the chart scale for `series`: the index sits on a zero baseline
+/// with headroom, so a small change does not look like a spike.
+fn chart_top(series: &[f64]) -> f64 {
+    series.iter().copied().fold(1., f64::max) * 1.2
+}
 // ------------------------------------------------------------------ crypto
 
 fn coin_disc(out: &mut Scene, assets: &Assets, symbol: &str, x: f32, y: f32, d: f32) {
@@ -674,6 +929,7 @@ fn price(state: &State, value: f64) -> String {
     w::format_price(value, &state.preferences.widgets.quote)
 }
 /// A line through `series` (oldest first) with an optional soft area below.
+/// `zero` scales from 0 to `chart_top` (air quality); otherwise min to max.
 /// The renderer has no line primitive: the line is a chain of small discs,
 /// the area a run of 2 px vertical gradients.
 pub(super) fn sparkline(
@@ -683,13 +939,19 @@ pub(super) fn sparkline(
     color: u32,
     line: f32,
     area: bool,
+    zero: bool,
 ) {
     if series.len() < 2 || r.w < 4. {
         return;
     }
-    let lo = series.iter().copied().fold(f64::MAX, f64::min);
-    let hi = series.iter().copied().fold(f64::MIN, f64::max);
-    let span = (hi - lo).max(hi.abs() * 1e-6).max(1e-12);
+    let (lo, span) = if zero {
+        let lo = series.iter().copied().fold(0., f64::min);
+        (lo, chart_top(series) - lo)
+    } else {
+        let lo = series.iter().copied().fold(f64::MAX, f64::min);
+        let hi = series.iter().copied().fold(f64::MIN, f64::max);
+        (lo, (hi - lo).max(hi.abs() * 1e-6).max(1e-12))
+    };
     let value = |u: f32| {
         let p = u * (series.len() - 1) as f32;
         let i = (p.floor() as usize).min(series.len() - 2);
@@ -795,6 +1057,7 @@ fn crypto_block(out: &mut Scene, state: &State, assets: &Assets, size: Size, r: 
                 if q.change_pct >= 0. { GREEN } else { RED },
                 3.,
                 true,
+                false,
             );
         }
         Size::M => {
@@ -887,6 +1150,7 @@ fn crypto_block(out: &mut Scene, state: &State, assets: &Assets, size: Size, r: 
                     if q.change_pct >= 0. { GREEN } else { RED },
                     3.,
                     true,
+                    false,
                 );
             } else {
                 out.text(
@@ -984,6 +1248,7 @@ fn coin_row(out: &mut Scene, state: &State, assets: &Assets, symbol: &str, r: Re
             spark,
             if q.change_pct >= 0. { GREEN } else { RED },
             2.5,
+            false,
             false,
         );
     }
@@ -1365,6 +1630,24 @@ fn text_item(state: &State, kind: Kind) -> (Option<String>, Option<String>, Vec<
                 )],
             )
         }
+        Kind::Air => match air(state) {
+            Some(a) => {
+                let (value, _, color) = air_reading(state, a);
+                (
+                    Some("air".into()),
+                    None,
+                    vec![
+                        (format!("AQI {value}"), WHITE),
+                        (air_word(state, a).into(), c(color, 1.)),
+                    ],
+                )
+            }
+            None => (
+                Some("air".into()),
+                None,
+                vec![(air_status(state).into(), c(0xffffff, 0.72))],
+            ),
+        },
         Kind::Crypto => {
             let symbol = state.preferences.widgets.main_coin.clone();
             match state.widget_data.quote(&symbol) {
@@ -1614,6 +1897,7 @@ pub(super) fn detail(out: &mut Scene, state: &State, assets: &Assets) {
     out.shape(Rect::new(0., 0., 1920., 1080.), 0., c(0x050608, 0.62));
     match d {
         Detail::Weather { tab } => weather_detail(out, state, assets, tab),
+        Detail::Air => air_detail(out, state, assets),
         Detail::Crypto { coin } => crypto_detail(out, state, assets, coin),
     }
     if let Some(opened) = state.widget_detail_started
@@ -2088,6 +2372,174 @@ fn weather_detail(out: &mut Scene, state: &State, assets: &Assets, tab: usize) {
         }
     }
 }
+fn air_detail(out: &mut Scene, state: &State, assets: &Assets) {
+    let scale = state.preferences.widgets.air_scale;
+    let panel = Rect::new(48., 48., 1824., 984.);
+    out.shadow(panel, 40., 80., 30., 0.5);
+    out.glass(panel, 40.);
+    close(out, state, assets, 1744., 96.);
+    city_line(out, state, assets, 112., 104., 700., 24.);
+    tabs(
+        out,
+        state,
+        assets,
+        &w::Scale::ALL.map(|s| s.title()),
+        w::Scale::ALL.iter().position(|s| *s == scale).unwrap_or(0),
+        112.,
+        452.,
+    );
+    let Some(a) = air(state) else {
+        out.text(
+            air_status(state),
+            Rect::new(112., 190., 1000., 60.),
+            ts(assets, 40., 600),
+            c(0xffffff, 0.8),
+            false,
+        );
+        return;
+    };
+    let (value, band, color) = air_reading(state, a);
+    let big = td(assets, 150.);
+    out.text(&value, Rect::new(112., 140., 600., 170.), big, WHITE, false);
+    let vx = 112. + width(assets, &value, big) + 28.;
+    out.text(
+        air_word(state, a),
+        Rect::new(vx, 200., 1100. - vx, 52.),
+        ts(assets, 40., 600),
+        c(color, 1.),
+        false,
+    );
+    out.text(
+        scale.title(),
+        Rect::new(vx, 254., 500., 30.),
+        ts(assets, 22., 500),
+        c(0xffffff, 0.65),
+        false,
+    );
+    out.text(
+        w::air_advice(band),
+        Rect::new(112., 322., 1080., 40.),
+        ts(assets, 28., 500),
+        c(0xffffff, 0.9),
+        false,
+    );
+    band_bar(out, Rect::new(112., 388., 600., 12.), band);
+
+    // Next 24 hours: grid, hour marks, then the line.
+    let series = air_series(state, a);
+    let chart = Rect::new(112., 620., 1000., 250.);
+    out.text(
+        "NEXT 24 HOURS",
+        Rect::new(chart.x, chart.y - 74., 400., 25.),
+        ts(assets, 18., 500).tracking(0.03),
+        c(0xffffff, 0.65),
+        false,
+    );
+    if series.len() >= 2 {
+        let top = chart_top(&series);
+        for k in 0..3 {
+            let v = top - top * k as f64 / 2.;
+            let y = chart.y + chart.h * k as f32 / 2.;
+            out.shape(Rect::new(chart.x, y, chart.w, 1.), 0., c(0xffffff, 0.08));
+            out.text(
+                format!("{v:.0}"),
+                Rect::new(chart.x + chart.w + 20., y - 13., 80., 26.),
+                ts(assets, 18., 500),
+                c(0xffffff, 0.6),
+                false,
+            );
+        }
+        let hours: Vec<u8> = a
+            .hours
+            .iter()
+            .zip(a.series(scale))
+            .filter(|(_, v)| v.is_finite())
+            .map(|(h, _)| h.0)
+            .collect();
+        let last = hours.len() - 1;
+        for k in 0..5 {
+            let at = last * k / 4;
+            let label = if k == 0 {
+                "Now".to_owned()
+            } else {
+                format!("{:02}:00", hours[at])
+            };
+            let x = chart.x + chart.w * at as f32 / last as f32;
+            out.text(
+                label,
+                Rect::new(x - 60., chart.y + chart.h + 22., 120., 26.),
+                ts(assets, 18., 500),
+                c(0xffffff, 0.6),
+                true,
+            );
+        }
+        sparkline(out, &series, chart, color, 4., true, true);
+    }
+
+    // Right column: pollutants, then pollen.
+    for (k, (label, v)) in pollutants(a).iter().enumerate() {
+        let r = Rect::new(
+            1296. + (k % 2) as f32 * 262.,
+            200. + (k / 2) as f32 * 166.,
+            246.,
+            150.,
+        );
+        out.shape(r, RADIUS, c(0xffffff, 0.07));
+        out.border(r, RADIUS, 1., c(0xffffff, 0.08));
+        out.text(
+            *label,
+            Rect::new(r.x + 24., r.y + 22., r.w - 48., 25.),
+            ts(assets, 18., 500).tracking(0.03),
+            c(0xffffff, 0.65),
+            false,
+        );
+        out.text(
+            v,
+            Rect::new(r.x + 24., r.y + 60., r.w - 48., 44.),
+            ts(assets, 30., 600),
+            WHITE,
+            false,
+        );
+    }
+    let r = Rect::new(1296., 532., 508., 340.);
+    out.shape(r, RADIUS, c(0xffffff, 0.07));
+    out.border(r, RADIUS, 1., c(0xffffff, 0.08));
+    out.text(
+        "POLLEN",
+        Rect::new(r.x + 24., r.y + 22., r.w - 48., 25.),
+        ts(assets, 18., 500).tracking(0.03),
+        c(0xffffff, 0.65),
+        false,
+    );
+    if a.pollen.is_empty() {
+        out.text(
+            "No pollen data for this place.\nForecasts cover Europe only.",
+            Rect::new(r.x + 24., r.y + 70., r.w - 48., 64.),
+            ts(assets, 22., 500).leading(1.4),
+            c(0xffffff, 0.8),
+            false,
+        );
+    } else {
+        let mut rows: Vec<(&str, f64)> = a
+            .pollen
+            .iter()
+            .zip(w::POLLEN)
+            .map(|(g, (_, name))| (name, *g))
+            .collect();
+        rows.sort_by(|x, y| y.1.total_cmp(&x.1));
+        let rows: Vec<(&str, String)> = rows
+            .into_iter()
+            .take(4)
+            .map(|(name, g)| (name, w::pollen_word(g).to_owned()))
+            .collect();
+        air_rows(
+            out,
+            assets,
+            &rows,
+            Rect::new(r.x + 24., r.y + 60., r.w - 48., r.h - 76.),
+        );
+    }
+}
 fn crypto_detail(out: &mut Scene, state: &State, assets: &Assets, coin: usize) {
     let prefs = &state.preferences.widgets;
     let coins = prefs.ordered_coins();
@@ -2180,6 +2632,7 @@ fn crypto_detail(out: &mut Scene, state: &State, assets: &Assets, coin: usize) {
             if q.change_pct >= 0. { GREEN } else { RED },
             4.,
             true,
+            false,
         );
         let label = prefs.period.label();
         let stats = [

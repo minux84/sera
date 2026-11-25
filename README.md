@@ -24,6 +24,7 @@ Free and open source (MIT). Fork it, change it, ship it.
 **Widgets**
 
 - Weather (Open-Meteo, no API key), with hourly and 10-day forecasts.
+- Air quality (European or US AQI, pollutants, 24-hour outlook and pollen) from Open-Meteo.
 - Crypto prices with charts (Binance, Coinbase, Kraken and others; public endpoints only).
 - HDMI input preview and Home Assistant status line.
 - Small, medium, large and text-line sizes, laid out on a grid.
