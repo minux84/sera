@@ -1885,8 +1885,12 @@ impl Renderer {
                     && fill_rect == rect
                     && fill_radius == radius
                     && tint[3] >= 0.999
-                    && let Some(source) = opaque_frost(path) =>
+                    && opaque_frost(path).is_some() =>
                 {
+                    // `if let` guards need Rust 1.95; keep the pinned 1.93 toolchain building.
+                    let Some(source) = opaque_frost(path) else {
+                        unreachable!("guard checked opaque_frost")
+                    };
                     self.frost(source, *rect, *radius, *tint, Some(*fill));
                     merged_next = true;
                     continue;
