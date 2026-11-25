@@ -204,7 +204,8 @@ fn metadata(value: Option<Value>) -> Vec<Value> {
         .unwrap_or_default()
 }
 
-/// The QR opens Plex's own sign-in with this PIN filled in.
+/// The QR opens Plex's own sign-in with this PIN filled in. app.plex.tv/auth
+/// only completes strong PINs; the short code is for plex.tv/link.
 fn auth_url(client_id: &str, code: &str) -> String {
     format!(
         "https://app.plex.tv/auth#?clientID={client_id}&code={code}\
@@ -212,32 +213,38 @@ fn auth_url(client_id: &str, code: &str) -> String {
     )
 }
 
-fn link(reply: &mpsc::Sender<Response>, client_id: String, attempt: u64) {
-    let agent = agent();
+/// A new plex.tv PIN as (id, code).
+fn create_pin(agent: &ureq::Agent, client_id: &str, strong: bool) -> Option<(String, String)> {
     let pin = request(
-        agent.post(&format!("{PLEX_TV}/api/v2/pins?strong=false")),
-        &client_id,
+        agent.post(&format!("{PLEX_TV}/api/v2/pins?strong={strong}")),
+        client_id,
         "",
     )
     .send_empty()
     .ok()
-    .and_then(read);
-    let Some(pin) = pin else {
+    .and_then(read)?;
+    let (id, code) = (text(&pin, "id"), text(&pin, "code"));
+    (!id.is_empty() && !code.is_empty()).then_some((id, code))
+}
+
+fn link(reply: &mpsc::Sender<Response>, client_id: String, attempt: u64) {
+    let agent = agent();
+    // Two PINs: the short one shown for plex.tv/link, a strong one for the QR.
+    let Some((short_id, code)) = create_pin(&agent, &client_id, false) else {
         let _ = reply.send(Response::Failed(
             "plex.tv did not answer. Check the internet".into(),
         ));
         return;
     };
-    let id = text(&pin, "id");
-    let code = text(&pin, "code");
-    if id.is_empty() || code.is_empty() {
-        let _ = reply.send(Response::Failed("plex.tv gave no code".into()));
-        return;
-    }
+    let strong = create_pin(&agent, &client_id, true);
+    let qr_code = strong.as_ref().map_or(code.as_str(), |(_, c)| c.as_str());
     let _ = reply.send(Response::Code {
-        qr: auth_url(&client_id, &code),
-        code,
+        qr: auth_url(&client_id, qr_code),
+        code: code.clone(),
     });
+    let ids: Vec<String> = std::iter::once(short_id)
+        .chain(strong.map(|(id, _)| id))
+        .collect();
     let deadline = Instant::now() + Duration::from_secs(890);
     let token = loop {
         thread::sleep(Duration::from_secs(2));
@@ -248,19 +255,19 @@ fn link(reply: &mpsc::Sender<Response>, client_id: String, attempt: u64) {
             let _ = reply.send(Response::Failed("The code expired. Get a new one".into()));
             return;
         }
-        let state = request(
-            agent.get(&format!("{PLEX_TV}/api/v2/pins/{id}")),
-            &client_id,
-            "",
-        )
-        .call()
-        .ok()
-        .and_then(read);
-        let token = state
-            .as_ref()
-            .map(|s| text(s, "authToken"))
-            .unwrap_or_default();
-        if !token.is_empty() {
+        let approved = ids.iter().find_map(|id| {
+            let state = request(
+                agent.get(&format!("{PLEX_TV}/api/v2/pins/{id}")),
+                &client_id,
+                "",
+            )
+            .call()
+            .ok()
+            .and_then(read)?;
+            let token = text(&state, "authToken");
+            (!token.is_empty()).then_some(token)
+        });
+        if let Some(token) = approved {
             break token;
         }
     };
