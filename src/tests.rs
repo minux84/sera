@@ -420,6 +420,30 @@ fn home_inputs_are_header_circles_left_of_settings() {
     }
 }
 #[test]
+fn header_inputs_show_a_green_dot_only_while_receiving_a_picture() {
+    let dots = |state: &State| {
+        scene(state)
+            .draw
+            .iter()
+            .filter(|d| matches!(d, crate::renderer::Draw::Shape(r, 8., 0., _) if r.w == 16. && r.h == 16.))
+            .count()
+    };
+    let mut state = ready();
+    for input in &state.inventory.inputs {
+        state
+            .preferences
+            .input_modes
+            .insert(input.id.clone(), InputMode::On);
+    }
+    // No picture report: no claim either way.
+    assert_eq!(dots(&state), 0);
+    state.inventory.inputs[0].signal = Some(true);
+    state.inventory.inputs[1].signal = Some(false);
+    assert_eq!(dots(&state), 1);
+    state.inventory.inputs[1].signal = Some(true);
+    assert_eq!(dots(&state), 2);
+}
+#[test]
 fn gallery_and_grid_navigation_scroll_to_keep_focus_visible() {
     let mut state = ready();
     state.open(2);

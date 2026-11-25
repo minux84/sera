@@ -138,7 +138,11 @@ the legacy installation-local preferences. Reapplying an active Home mount also 
 ## Vector rendering
 
 `assets/ui-icons/` holds standalone SVGs exported from the original Lucide/control artwork,
-including the supplied PlayStation/Apple TV marks. `assets/logos/` holds original bundled logos.
+including the supplied PlayStation/Apple TV marks and the simplified Switch/Windows input
+icons. An input's icon comes from its custom name, otherwise the TV's label (`device_icon` in
+`src/view.rs`): "PS5" → PlayStation, "Switch"/"Nintendo" → Switch, "Windows"/"PC" → Windows.
+Header input circles show a green dot while the port reports a picture (eim
+`getHDMISignalInfo`) and dim the icon when a plugged-in device sends none. `assets/logos/` holds original bundled logos.
 `tools/vector-assets/` parses SVGs with usvg, resolves stroke outlines and transforms, and uses
 the shared lyon tessellator to emit `.lvec` geometry. The format contains positions, edge offsets,
 vertex colors and coverage; holes, round strokes and the bundled gradients are preserved.

@@ -1239,7 +1239,19 @@ fn header_circles(out: &mut Scene, state: &State, assets: &Assets) {
             accent_fill(out, lift, radius, state);
             out.fade(start, focus, 1.);
         }
-        let ink = blend(c(0xffffff, 0.92), accent_ink(state), focus);
+        // Picture report for inputs: None for settings or unreported ports.
+        let signal = match &target {
+            Target::Input(id) => state
+                .inventory
+                .inputs
+                .iter()
+                .find(|input| &input.id == id)
+                .and_then(|input| input.signal),
+            _ => None,
+        };
+        // A device that is plugged in but asleep keeps a dimmed icon.
+        let idle = if signal == Some(false) { 0.5 } else { 0.92 };
+        let ink = blend(c(0xffffff, idle), accent_ink(state), focus);
         let size = if icon == "input-apple-tv" { 38. } else { 30. };
         out.icon(
             assets,
@@ -1252,6 +1264,11 @@ fn header_circles(out: &mut Scene, state: &State, assets: &Assets) {
             ),
             ink,
         );
+        if signal == Some(true) {
+            // Badge on the lower right rim (45°), following the focus lift.
+            let edge = radius * std::f32::consts::FRAC_1_SQRT_2;
+            signal_dot(out, lift.x + radius + edge, lift.y + radius + edge, 16.);
+        }
         if focus > 0. && !state.pointer {
             let style = TextStyle::new(20.).weight(600).leading(1.3);
             let width = assets.width(&caption, style) + 8.;
@@ -1268,6 +1285,23 @@ fn header_circles(out: &mut Scene, state: &State, assets: &Assets) {
         out.control(target, rect, false);
     }
 }
+
+/// Green "receiving a picture" dot centred on (`x`, `y`), with a dark ring so
+/// it stays legible over glass, accent fills and bright device tiles.
+pub(crate) fn signal_dot(out: &mut Scene, x: f32, y: f32, d: f32) {
+    let ring = d + 6.;
+    out.shape(
+        Rect::new(x - ring / 2., y - ring / 2., ring, ring),
+        ring / 2.,
+        c(0x0b0d10, 0.7),
+    );
+    out.shape(
+        Rect::new(x - d / 2., y - d / 2., d, d),
+        d / 2.,
+        c(SIGNAL_GREEN, 1.),
+    );
+}
+pub(crate) const SIGNAL_GREEN: u32 = 0x30d158;
 
 /// App tiles and stack posters share one generous corner radius.
 pub(crate) const TILE_RADIUS: f32 = 26.;
@@ -3786,20 +3820,29 @@ fn input_icon(input: &Input, custom: Option<&str>) -> &'static str {
 }
 
 fn device_icon(name: &str) -> &'static str {
-    let name = name.to_lowercase().replace(' ', "");
-    if name.contains("playstation") || ["ps1", "ps2", "ps3", "ps4", "ps5"].contains(&name.as_str())
-    {
+    let name = name.to_lowercase().replace([' ', '-', '_'], "");
+    // "PS5", "PS4 Pro", "PS Vita": "ps" followed by a digit or a known model.
+    let playstation = name.strip_prefix("ps").is_some_and(|rest| {
+        rest.starts_with(|c: char| c.is_ascii_digit()) || rest.starts_with("vita")
+    });
+    if name.contains("playstation") || playstation {
         "playstation"
     } else if name.contains("appletv") {
         "apple-tv"
     } else if name.contains("usb") {
         "usb"
-    } else if ["xbox", "switch", "console"]
+    } else if ["switch", "nintendo"]
         .iter()
         .any(|part| name.contains(part))
     {
+        "switch"
+    } else if ["windows", "pc"].iter().any(|part| name.contains(part))
+        || ["win10", "win11"].contains(&name.as_str())
+    {
+        "windows"
+    } else if ["xbox", "console"].iter().any(|part| name.contains(part)) {
         "console"
-    } else if ["pc", "computer", "laptop"]
+    } else if ["computer", "laptop", "mac"]
         .iter()
         .any(|part| name.contains(part))
     {
@@ -5036,6 +5079,52 @@ mod tabular_layout_tests {
             let one = assets.width("11:11", style);
             let zero = assets.width("00:00", style);
             assert!((one - zero).abs() < 0.01, "{font:?}: {one} != {zero}");
+        }
+    }
+}
+
+#[cfg(test)]
+mod input_icon_tests {
+    use super::*;
+
+    #[test]
+    fn device_names_choose_their_icon() {
+        for (name, icon) in [
+            ("PlayStation 5", "playstation"),
+            ("PS5", "playstation"),
+            ("PS4 Pro", "playstation"),
+            ("Nintendo Switch", "switch"),
+            ("Switch 2", "switch"),
+            ("Windows", "windows"),
+            ("PC", "windows"),
+            ("Gaming PC", "windows"),
+            ("Win11", "windows"),
+            ("MacBook", "computer"),
+            ("Xbox Series X", "console"),
+            ("Apple TV", "apple-tv"),
+            ("Fire TV", "streamer"),
+            ("HDMI 3", "hdmi"),
+            ("Psycho", "hdmi"),
+        ] {
+            assert_eq!(device_icon(name), icon, "{name}");
+        }
+    }
+
+    #[test]
+    fn every_input_icon_has_a_bundled_svg() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/ui-icons");
+        for icon in [
+            "playstation",
+            "apple-tv",
+            "usb",
+            "switch",
+            "windows",
+            "console",
+            "computer",
+            "streamer",
+            "hdmi",
+        ] {
+            assert!(root.join(format!("input-{icon}.svg")).is_file(), "{icon}");
         }
     }
 }

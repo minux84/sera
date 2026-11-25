@@ -996,6 +996,8 @@ fn device_colors(icon: &str) -> (u32, u32) {
         "playstation" => (0x2a4cae, 0x1c2f6a),
         "computer" => (0x4f3496, 0x2f205e),
         "console" => (0x2f7d4a, 0x1d4b2e),
+        "switch" => (0xb3262d, 0x6b161b),
+        "windows" => (0x1266b8, 0x0b3d6e),
         "streamer" => (0x8a3b2c, 0x52231a),
         _ => (0x41464f, 0x2c3037),
     }
@@ -1040,6 +1042,9 @@ fn input_tile(
         WHITE,
         false,
     );
+    if !big && input.signal == Some(true) {
+        signal_dot(out, r.x + r.w - 26., r.y + 26., 16.);
+    }
     if big {
         // Port and signal chips, top left.
         let mut x = r.x + 26.;
