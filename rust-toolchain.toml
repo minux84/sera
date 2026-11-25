@@ -1,0 +1,5 @@
+# Match CI (dtolnay/rust-toolchain@1.93.0) and flake.nix; includes the TV's soft-float target.
+[toolchain]
+channel = "1.93.0"
+components = ["rustfmt", "clippy"]
+targets = ["armv7-unknown-linux-gnueabi"]

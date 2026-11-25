@@ -46,6 +46,9 @@ including `armv7-unknown-linux-gnueabi` for TV builds. No browser installation i
 | `pnpm build`              | Release ARM cross-build using `WEBOS_NDK`                  |
 | `pnpm run package`        | Assets, cross-build, IPK verification and Homebrew feed    |
 | `pnpm deploy --device tv` | Build/install/launch through an ares device profile        |
+| `pnpm deploy:root`        | Build, then install/launch on a rooted TV over root SSH    |
+| `pnpm install:root`       | Install/launch the existing `dist/` IPKs over root SSH     |
+| `pnpm restart:root`       | Close and relaunch the installed Luma over root SSH        |
 | `pnpm check`              | Oxlint and workspace Clippy, without executing tests       |
 | `pnpm format:check`       | Rust and tooling/document formatting checks                |
 | `pnpm test`               | Release-tooling and Rust workspace unit tests              |
@@ -314,6 +317,19 @@ presentations. Hidden windows pause profiling. Capture stalls are excluded. CPU 
 not a GPU timestamp, and `--frames` counts event-loop iterations, not presentation rate.
 Inspect `window`, `drawable`, `drawable_is_4k`, `last_presented`, `capture` and `profile` in JSON.
 Do not infer 60 fps from a successful VSync request; measure actual TV pacing and transitions.
+
+## Deploying to a rooted TV
+
+Without Nix, `sh tools/setup-host.sh` installs pkgconf/woff2/SDL2 (Homebrew), the Rust toolchain
+pinned in `rust-toolchain.toml` with the ARM target, a fontTools venv in `.venv`, the pinned pnpm
+via a corepack shim in `.build/bin`, the node modules and the webOS SDK. Each new shell then runs
+`. tools/env.sh` to export `WEBOS_NDK` and that `PATH`.
+
+`pnpm deploy:root -- --host <TV-IP>` packages, uploads both IPKs over SSH (`root`, port 22) and
+installs them through `appInstallService/dev/install`, the path Homebrew Channel uses, then
+relaunches Luma. No ares profile or Developer Mode app is needed. Put defaults in the
+git-ignored `.env.tv` (`LUMA_TV_HOST`, `LUMA_TV_PORT`, `LUMA_TV_USER`, `LUMA_TV_KEY`). Options:
+`--key <file>`, `--no-player`, `--no-launch`, `--restart` (relaunch only). A password (often `alpine`) is asked once per run.
 
 ## TV startup diagnostics
 
