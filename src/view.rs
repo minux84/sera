@@ -1989,13 +1989,38 @@ const GLASS_PLAIN: f32 = 0.66;
 const PHRASE_TOP: f32 = 268.;
 const PHRASE_W: f32 = 1140.;
 
+/// Plain greeting headline. Beside the widgets its column is narrow, so a long
+/// greeting ("Good afternoon, Ana.") wraps; the box grows by whole lines
+/// instead of clipping the second one to "Good…". Returns the bottom edge.
+fn plain_greeting(
+    out: &mut Scene,
+    assets: &Assets,
+    state: &State,
+    greeting: String,
+    top: f32,
+    style: TextStyle,
+    one_line: f32,
+) -> f32 {
+    let wrap = widgets_view::phrase_width(state);
+    let lines = assets.lines(&greeting, style, wrap).max(1);
+    let line_step = style.size
+        * assets.active_heading.get().scale()
+        * assets.heading_pct.get() as f32
+        / 100.
+        * style.line_height;
+    let height = one_line + (lines - 1) as f32 * line_step;
+    out.text(greeting, Rect::new(84., top, wrap, height), style, WHITE, false);
+    // One line keeps the 110 px slot the Home layout was tuned for.
+    top + 110. + (lines - 1) as f32 * line_step
+}
+
 fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
     let language = state.preferences.language;
     let s = state.scroll + state.bounce_at(crate::state::BounceAxis::Page) - HOME_DROP;
     // Weather gets a distinct TV-sized widget instead of reducing the greeting.
     let shift = 0.0f32;
     let greeting_start = out.draw.len();
-    let mut greeting_bottom = 0.0f32;
+    let greeting_bottom: f32;
     let mut greeting_width = 900.0f32;
     if state.preferences.greeting_style == crate::weather_phrases::GreetingStyle::Rude {
         if let Some(phrase) = &state.rude_weather.current {
@@ -2050,37 +2075,26 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
                 },
             );
         } else {
-            let greeting = language.greeting(now.hour(), &state.preferences.greeting_name);
-            out.text(
-                &greeting,
-                Rect::new(
-                    84.,
-                    PHRASE_TOP - shift - s,
-                    widgets_view::phrase_width(state),
-                    109.,
-                ),
+            greeting_bottom = plain_greeting(
+                out,
+                assets,
+                state,
+                language.greeting(now.hour(), &state.preferences.greeting_name),
+                PHRASE_TOP - shift - s,
                 text(99., 550, -0.055).display(true).leading(1.05),
-                WHITE,
-                false,
+                109.,
             );
         }
     } else {
-        let greeting = language.greeting(now.hour(), &state.preferences.greeting_name);
-        out.text(
-            &greeting,
-            Rect::new(
-                84.,
-                PHRASE_TOP - shift - s,
-                widgets_view::phrase_width(state),
-                95.,
-            ),
+        greeting_bottom = plain_greeting(
+            out,
+            assets,
+            state,
+            language.greeting(now.hour(), &state.preferences.greeting_name),
+            PHRASE_TOP - shift - s,
             text(90.4, 500, -0.065).display(true).leading(1.05),
-            WHITE,
-            false,
+            95.,
         );
-    }
-    if greeting_bottom <= 0. {
-        greeting_bottom = PHRASE_TOP + 110. - s;
     }
     out.enter(greeting_start, state, 0.13, 32.);
     // Variant D video caption sits under the headline; its slot is always kept.
