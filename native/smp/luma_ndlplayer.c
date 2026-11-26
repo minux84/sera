@@ -2,8 +2,10 @@
  * ABI-compatible with src/hw_wallpaper.rs; video-only, no RGB readback.
  * Luma photo fallback is kept until the TV reports a decoded frame.
  */
+#define _GNU_SOURCE
 #define NDL_DIRECTMEDIA_API_VERSION 2
 #include <NDL_directmedia.h>
+#include <dlfcn.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -40,6 +42,68 @@ static const unsigned char silent_opus_20ms[3]={0xfc,0xff,0xfe};
 // Keep audio at most this far ahead of the newest video PTS.
 #define AUDIO_AHEAD_MS 40
 static LumaNDL *active=NULL;
+static void record(const char *label,int64_t value);
+
+/* NDL DirectMedia is built for game streaming: it always loads Starfish with
+ * option.lowDelayMode/isGameMode = true. Low-delay presents each frame as soon
+ * as it is decoded, ignoring PTS, so B-frame clips come out in pairs and look
+ * like ~15fps. Interpose StarfishMediaAPIs::Load (called by
+ * libNDL_directmedia_impl) and turn both flags off for DirectMedia loads only,
+ * so the pipeline presents by PTS against the (silent) audio clock. */
+#define STARFISH_LOAD "_ZN17StarfishMediaAPIs4LoadEPKcPFvixS1_E"
+typedef long (*StarfishLoad)(void *self,const char *json,void (*cb)(int,long long,const char *));
+// Copy of json with `"key": true` turned into `"key": false`; NULL if absent.
+static char *json_set_false(const char *json,const char *key) {
+    char needle[64];
+    snprintf(needle,sizeof(needle),"\"%s\"",key);
+    const char *at=strstr(json,needle);
+    if(!at)return NULL;
+    const char *v=at+strlen(needle);
+    while(*v==' '||*v==':'||*v=='\t')v++;
+    if(strncmp(v,"true",4))return NULL;
+    size_t head=(size_t)(v-json),len=strlen(json);
+    char *out=malloc(len+2);
+    if(!out)return NULL;
+    memcpy(out,json,head);
+    memcpy(out+head,"false",5);
+    memcpy(out+head+5,v+4,len-head-4+1);
+    return out;
+}
+static void log_load(const char *label,const char *json) {
+    FILE *f=fopen("/media/developer/com.denisefremov.luma/luma-ndl-load.log",
+                  strcmp(label,"ORIGINAL")?"a":"w");
+    if(f){fprintf(f,"%s %s\n",label,json);fclose(f);}
+}
+__attribute__((visibility("default")))
+long _ZN17StarfishMediaAPIs4LoadEPKcPFvixS1_E(void *self,const char *json,
+                                             void (*cb)(int,long long,const char *)) {
+    static StarfishLoad real=NULL;
+    if(!real){
+        void *h=dlopen("libplayerAPIs.so.1",RTLD_NOW|RTLD_NOLOAD);
+        if(!h)h=dlopen("libplayerAPIs.so.1",RTLD_NOW);
+        if(h)real=(StarfishLoad)dlsym(h,STARFISH_LOAD);
+        if(!real)real=(StarfishLoad)dlsym(RTLD_NEXT,STARFISH_LOAD);
+        if(!real){record("LOAD_HOOK_MISSING",-1);return 0;}
+    }
+    if(!json || !strstr(json,"DIRECTMEDIA") || getenv("LUMA_NDL_LOW_DELAY"))
+        return real(self,json,cb);
+    log_load("ORIGINAL",json);
+    char *a=json_set_false(json,"lowDelayMode");
+    char *b=json_set_false(a?a:json,"isGameMode");
+    const char *patched=b?b:(a?a:json);
+    log_load("PATCHED",patched);
+    record("LOW_DELAY_OFF",a!=NULL);
+    long rc=real(self,patched,cb);
+    free(a);free(b);
+    return rc;
+}
+/* Luma dlopens this library RTLD_LOCAL. Promote it to the global scope so the
+ * definition above wins when NDL later dlopens its implementation library. */
+__attribute__((constructor)) static void promote_global(void) {
+    Dl_info info;
+    if(dladdr((void *)promote_global,&info) && info.dli_fname)
+        dlopen(info.dli_fname,RTLD_NOW|RTLD_NOLOAD|RTLD_GLOBAL);
+}
 static void record(const char *label,int64_t value) {
     FILE *f=fopen("/media/developer/com.denisefremov.luma/luma-ndl-events.log","a");
     if(f){fprintf(f,"%s %lld\n",label,(long long)value);fclose(f);}
