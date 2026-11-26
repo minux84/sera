@@ -1,7 +1,7 @@
-# Luma assets and references
+# Sera assets and references
 
 - `assets/mark.svg`, `assets/app-icon.svg`, and the Midnight/Slate/Prism SVG wallpapers:
-  original Luma artwork, MIT. webOS supplies the app icon panel using `iconColor`.
+  original Sera artwork, MIT. webOS supplies the app icon panel using `iconColor`.
 - `assets/wallpapers/dunes.jpg`: Unsplash photo `1509316785289-025f5b846b35`,
   https://images.unsplash.com/photo-1509316785289-025f5b846b35, [Unsplash License](https://unsplash.com/license).
 - `assets/wallpapers/san-francisco.jpg`: Unsplash photo `1501594907352-04cda38ebc29`,
@@ -18,16 +18,16 @@
 - Inter variable font: Rasmus Andersson, SIL Open Font License 1.1, `assets/fonts/ofl.txt`.
 - Noto Sans SC: copyright 2014–2021 Adobe, SIL OFL 1.1. Source/license in `assets/fonts/`;
   `tools/font-assets.mjs` pins the Google Fonts revision and checksums. Generated regular/medium
-  subsets are renamed Luma CJK and retain copyright/license tables.
+  subsets are renamed Sera CJK and retain copyright/license tables.
 - Noto Sans KR: copyright 2014–2021 Adobe, SIL OFL 1.1 (same license text as Noto Sans SC,
   `assets/fonts/noto-ofl.txt`). Pinned the same way. Google Fonts ships Hangul only in this family,
-  not in Noto Sans SC; generated Hangul-only regular/medium subsets are renamed Luma KR.
+  not in Noto Sans SC; generated Hangul-only regular/medium subsets are renamed Sera KR.
 - Lucide interface icons: exported standalone SVG sources in `assets/ui-icons/`, ISC license
   bundled at `assets/licenses/lucide.txt`. PlayStation/Apple TV input paths were supplied by the
   user; the brand marks belong to Sony/Apple. The Nintendo Switch (two Joy-Con halves) and
-  Windows (four panes) input icons are simplified Luma drawings; the marks they evoke belong to
+  Windows (four panes) input icons are simplified Sera drawings; the marks they evoke belong to
   Nintendo/Microsoft. Spotify/Kodi symbol treatments use the original
-  native artwork. Logos identify third-party apps; Luma is unaffiliated with their owners.
+  native artwork. Logos identify third-party apps; Sera is unaffiliated with their owners.
 - SDL-webOS 2.30.12 (`release-2.30.12-webos.5`, standard SDL ABI), zlib license.
   `tools/webos-runtime.mjs` records archive/library SHA-256. Notice at `assets/licenses/sdl2.txt`.
 
@@ -98,7 +98,7 @@ to compiled `.lvec` derivatives.
 
 ### Live TV and browser cards
 
-`live-tv.svg` and `browser.svg` are original Luma artwork, MIT. Both share a blue/cyan material
+`live-tv.svg` and `browser.svg` are original Sera artwork, MIT. Both share a blue/cyan material
 with a light rim and white details. Live TV uses a rounded display, play symbol and live
 indicator. Browser uses a globe with a navigation pointer. The gradients and highlights are vector
 geometry, with no embedded images, runtime fonts, filters or raster effects. Each utility card
@@ -107,7 +107,7 @@ uses its native app's exact ID.
 On TV, installed-app PNG/JPEG/WebP artwork is read from that TV's installed applications at runtime.
 Desktop previews use curated vector logos or generic/category fallbacks, with no dumped TV artwork
 or collected icon maps in the repository. Names and marks remain the property of the respective
-app owners. Luma's folded-light L logo is original artwork; its SVG geometry produces the
+app owners. Sera's folded-light L logo is original artwork; its SVG geometry produces the
 small/large webOS installation icons.
 
 Weather data: [Open-Meteo](https://open-meteo.com/), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
@@ -124,7 +124,7 @@ native GPU renderer, subsets Latin/Latin Extended/Cyrillic, and copies their
 OFL licenses into the packaged assets. The package does not depend on Google Fonts
 at runtime.
 
-| Typeface  | Family source                                                            | Role in Luma                                      | License                          |
+| Typeface  | Family source                                                            | Role in Sera                                      | License                          |
 | --------- | ------------------------------------------------------------------------ | ------------------------------------------------- | -------------------------------- |
 | Archivo   | [ofl/archivo](https://github.com/google/fonts/tree/main/ofl/archivo)     | Cinema display 800, width 112.5                   | `assets/fonts/archivo-OFL.txt`   |
 | Fraunces  | [ofl/fraunces](https://github.com/google/fonts/tree/main/ofl/fraunces)   | Editorial display 700, opsz 72, SOFT 50           | `assets/fonts/fraunces-OFL.txt`  |

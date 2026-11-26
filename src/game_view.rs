@@ -352,7 +352,7 @@ fn draw_game(
         c(0xffffff, 0.85),
         false,
     );
-    // How to leave the stream: Moonlight has the gamepad, not Luma. With root,
+    // How to leave the stream: Moonlight has the gamepad, not Sera. With root,
     // pad_watch closes the game on a double Start+Select.
     let hint = if state.root.is_some() {
         "To exit the game, press Start + Select twice"

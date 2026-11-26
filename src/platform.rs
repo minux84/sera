@@ -8,14 +8,14 @@ use crate::{
 use serde_json::{Value, json};
 use std::{collections::HashSet, sync::mpsc, thread};
 
-pub const APP_ID: &str = "com.denisefremov.luma";
+pub const APP_ID: &str = "it.bytebuilder.sera";
 pub const HOME_ID: &str = "com.webos.app.home";
 
 pub fn redirect_to_home() -> Result<bool, String> {
     // The root-only integration mounts this marker with its native Home
     // manifest. A normal tile launch then opens that same instance instead of
     // starting a second renderer writing the same preferences.
-    if std::fs::read_to_string("/usr/palm/applications/com.webos.app.home/.luma-home")
+    if std::fs::read_to_string("/usr/palm/applications/com.webos.app.home/.sera-home")
         .is_ok_and(|marker| marker.trim() == APP_ID)
     {
         thread::spawn(|| {
@@ -37,7 +37,7 @@ pub enum Request {
     MoonlightLaunch(crate::moonlight::MoonlightLink, i64),
     /// Close another app (best effort; webOS may refuse without root).
     CloseApp(String),
-    /// Open Luma's web player app with these launch parameters. They hold
+    /// Open Sera's web player app with these launch parameters. They hold
     /// signed URLs and a token, so they are never logged.
     WebPlayer(Value),
     /// Read root features, after applying a change when one is given.
@@ -48,7 +48,7 @@ pub enum Request {
 pub enum Response {
     Inventory(Result<(Inventory, Option<String>), String>),
     Launched(Result<(), String>),
-    /// `None` when Homebrew Channel has no root: Luma runs as a plain app.
+    /// `None` when Homebrew Channel has no root: Sera runs as a plain app.
     Root(Result<Option<RootStatus>, String>),
     /// (HDMI port number, picture present).
     Signals(Vec<(u8, bool)>),
@@ -56,7 +56,7 @@ pub enum Response {
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct RootStatus {
-    /// Luma opens when the TV turns on (boot and Quick Start+ wake).
+    /// Sera opens when the TV turns on (boot and Quick Start+ wake).
     pub wake: bool,
     /// LG «Home Auto Launch»; `None` when the TV did not answer.
     pub home_auto_launch: Option<bool>,
@@ -94,7 +94,7 @@ impl Platform {
                     Request::Root(change) => Response::Root(if webos {
                         root_features(change)
                     } else {
-                        Ok(std::env::var_os("LUMA_ROOT_PREVIEW").map(|_| RootStatus {
+                        Ok(std::env::var_os("SERA_ROOT_PREVIEW").map(|_| RootStatus {
                             wake: true,
                             home_auto_launch: Some(false),
                         }))
@@ -174,9 +174,9 @@ impl Platform {
     }
 }
 
-/// Luma's own player: a small web app around the TV's web video element.
-pub const WEB_PLAYER_ID: &str = "com.denisefremov.luma.player";
-pub const INSTALL_PLAYER_MESSAGE: &str = "Install Luma Player from Homebrew Channel";
+/// Sera's own player: a small web app around the TV's web video element.
+pub const WEB_PLAYER_ID: &str = "it.bytebuilder.sera.player";
+pub const INSTALL_PLAYER_MESSAGE: &str = "Install Sera Player from Homebrew Channel";
 
 // webOS versions use slightly different texts for unknown application IDs.
 fn player_not_installed(error: &str) -> bool {
@@ -202,7 +202,7 @@ fn call(uri: &str, payload: Value) -> Result<Value, String> {
     };
     response.and_then(checked_response).map_err(|error| {
         let error = format!("{uri}: {error}");
-        eprintln!("Luma TV service: {error}");
+        eprintln!("Sera TV service: {error}");
         error
     })
 }
@@ -221,7 +221,7 @@ fn checked_response(value: Value) -> Result<Value, String> {
 }
 
 fn inventory_read(uri: &str, field: &str) -> Result<Value, String> {
-    // Without root, ask the service as Luma itself; keep the root error when
+    // Without root, ask the service as Sera itself; keep the root error when
     // the TV refuses that too.
     root_inventory_read(uri, field).or_else(|root_error| {
         call(uri, json!({}))
@@ -244,7 +244,7 @@ fn root_inventory_read(uri: &str, field: &str) -> Result<Value, String> {
     )?;
     inventory_payload(&envelope, field).map_err(|error| {
         let error = format!("{uri}: {error}");
-        eprintln!("Luma TV inventory: {error}");
+        eprintln!("Sera TV inventory: {error}");
         error
     })
 }
@@ -356,18 +356,18 @@ fn inventory_payload(envelope: &Value, field: &str) -> Result<Value, String> {
         .ok_or_else(|| format!("Missing TV inventory field: {field}"))
 }
 
-const WAKE_SCRIPT: &str = "/var/lib/webosbrew/init.d/71-luma-wake";
-const WAKE_OFF: &str = "/var/lib/webosbrew/luma-autostart-disabled";
+const WAKE_SCRIPT: &str = "/var/lib/webosbrew/init.d/71-sera-wake";
+const WAKE_OFF: &str = "/var/lib/webosbrew/sera-autostart-disabled";
 
 fn root_features(change: Option<RootSet>) -> Result<Option<RootStatus>, String> {
     let quote = |value: &str| format!("'{}'", value.replace('\'', "'\\''"));
     // Stop the running watcher and its subscription before switching.
-    let stop = "p=$(cat /tmp/luma-wake.pid 2>/dev/null); if [ -n \"$p\" ]; then pkill -P \"$p\"; kill \"$p\"; fi; rm -f /tmp/luma-wake.pid";
+    let stop = "p=$(cat /tmp/sera-wake.pid 2>/dev/null); if [ -n \"$p\" ]; then pkill -P \"$p\"; kill \"$p\"; fi; rm -f /tmp/sera-wake.pid";
     let apply = match change {
         None => String::new(),
         Some(RootSet::Wake(true)) => format!(
             "{stop}; printf '%s' {} > {WAKE_SCRIPT} && chmod 755 {WAKE_SCRIPT} && rm -f {WAKE_OFF} && {WAKE_SCRIPT}; ",
-            quote(include_str!("../tv/luma-wake.sh"))
+            quote(include_str!("../tv/sera-wake.sh"))
         ),
         Some(RootSet::Wake(false)) => format!("touch {WAKE_OFF}; {stop}; "),
         Some(RootSet::HomeAutoLaunch(on)) => format!(
@@ -376,13 +376,13 @@ fn root_features(change: Option<RootSet>) -> Result<Option<RootStatus>, String> 
         ),
     };
     // Gamepad watcher for a double Start+Select during a stream (pad_watch).
-    // Restarted when Luma was updated, so it always runs the current binary.
-    let bin = "/media/developer/apps/usr/palm/applications/com.denisefremov.luma/luma";
+    // Restarted when Sera was updated, so it always runs the current binary.
+    let bin = "/media/developer/apps/usr/palm/applications/it.bytebuilder.sera/sera";
     let pid = crate::pad_watch::PIDFILE;
     let pad = format!(
         "p=$(cat {pid} 2>/dev/null); if [ -n \"$p\" ] && kill -0 \"$p\" 2>/dev/null; then \
          [ {bin} -nt {pid} ] && kill \"$p\" && p=; else p=; fi; \
-         if [ -z \"$p\" ] && [ -x {bin} ]; then nohup {bin} --pad-watch > /tmp/luma-pad-watch.log 2>&1 < /dev/null & fi; "
+         if [ -z \"$p\" ] && [ -x {bin} ]; then nohup {bin} --pad-watch > /tmp/sera-pad-watch.log 2>&1 < /dev/null & fi; "
     );
     let command = format!(
         "if [ \"$(id -u)\" != 0 ]; then echo noroot; exit 0; fi; {apply}{pad}echo root; \
@@ -422,7 +422,7 @@ pub fn parse_root_status(stdout: &str) -> Option<RootStatus> {
 }
 
 /// Picture present per HDMI port. The reply lists every port whatever id is
-/// asked for. Root first (always allowed), then Luma's own call.
+/// asked for. Root first (always allowed), then Sera's own call.
 fn hdmi_signals() -> Result<Vec<(u8, bool)>, String> {
     let uri = "luna://com.webos.service.eim/getHDMISignalInfo";
     let command = format!(
@@ -468,7 +468,7 @@ fn inventory() -> Result<(Inventory, Option<String>), String> {
         Ok(mut inputs) => {
             crate::model::apply_signals(&mut inputs, &hdmi_signals().unwrap_or_default());
             eprintln!(
-                "Luma TV inventory: {} apps, {} inputs",
+                "Sera TV inventory: {} apps, {} inputs",
                 apps.len(),
                 inputs.len()
             );

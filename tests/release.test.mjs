@@ -45,14 +45,14 @@ test('version sync changes only release versions and is idempotent', async (t) =
   assert.equal(after[1], before[1].replace(`version = "${previous}"`, 'version = "3.1.0"'));
   assert.equal(
     after[2],
-    before[2].replace(`name = "luma"\nversion = "${previous}"`, 'name = "luma"\nversion = "3.1.0"'),
+    before[2].replace(`name = "sera"\nversion = "${previous}"`, 'name = "sera"\nversion = "3.1.0"'),
     'dependency versions and helper crates must be preserved',
   );
   assert.equal(
     after[3],
     before[3].replaceAll(
-      `com.denisefremov.luma_${previous}_arm.ipk`,
-      'com.denisefremov.luma_3.1.0_arm.ipk',
+      `it.bytebuilder.sera_${previous}_arm.ipk`,
+      'it.bytebuilder.sera_3.1.0_arm.ipk',
     ),
   );
   assert.deepEqual((await syncVersions(directory, { check: true })).changed, []);
@@ -70,10 +70,10 @@ test('invalid release versions and missing packages fail before writing metadata
   const lockfile = path.join(directory, 'Cargo.lock');
   await fs.writeFile(
     lockfile,
-    (await fs.readFile(lockfile, 'utf8')).replace('name = "luma"', 'name = "other"'),
+    (await fs.readFile(lockfile, 'utf8')).replace('name = "sera"', 'name = "other"'),
   );
   const before = await readMetadata(directory);
-  await assert.rejects(syncVersions(directory), /one luma package in Cargo.lock/);
+  await assert.rejects(syncVersions(directory), /one sera package in Cargo.lock/);
   assert.deepEqual(await readMetadata(directory), before);
 });
 
@@ -93,11 +93,11 @@ test('the real release command combines changesets and synchronizes every file',
   await fs.symlink(path.join(root, 'node_modules'), path.join(directory, 'node_modules'), 'dir');
   await fs.writeFile(
     path.join(directory, '.changeset/fix.md'),
-    '---\n"lg-luma": patch\n---\n\nFix release behavior.\n',
+    '---\n"sera": patch\n---\n\nFix release behavior.\n',
   );
   await fs.writeFile(
     path.join(directory, '.changeset/feature.md'),
-    '---\n"lg-luma": minor\n---\n\nAdd a release feature.\n',
+    '---\n"sera": minor\n---\n\nAdd a release feature.\n',
   );
   const result = spawnSync('pnpm', ['version:release'], {
     cwd: directory,
@@ -118,7 +118,7 @@ function gateFixture({ pull = {}, previous = '2.0.3', current = '2.0.4', event =
   const context = {
     eventName: 'push',
     ref: 'refs/heads/main',
-    repo: { owner: 'ecklf', repo: 'lg-luma' },
+    repo: { owner: 'minux84', repo: 'sera' },
     sha: 'merged-commit',
     payload: { before: 'previous-commit', forced: false, deleted: false },
     ...event,
@@ -126,8 +126,8 @@ function gateFixture({ pull = {}, previous = '2.0.3', current = '2.0.4', event =
   const releasePull = {
     merged_at: '2026-10-23T12:00:00Z',
     merge_commit_sha: context.sha,
-    base: { ref: 'main', repo: { full_name: 'ecklf/lg-luma' } },
-    head: { ref: 'changeset-release/main', repo: { full_name: 'ecklf/lg-luma' } },
+    base: { ref: 'main', repo: { full_name: 'minux84/sera' } },
+    head: { ref: 'changeset-release/main', repo: { full_name: 'minux84/sera' } },
     ...pull,
   };
   const reads = [];
@@ -164,18 +164,15 @@ test('a merged same-repository version PR with an increased version can publish'
 
 test('ordinary merges, unmerged PRs, forks and manual runs cannot publish', async (t) => {
   const cases = [
-    ['feature PR', { pull: { head: { ref: 'feature', repo: { full_name: 'ecklf/lg-luma' } } } }],
+    ['feature PR', { pull: { head: { ref: 'feature', repo: { full_name: 'minux84/sera' } } } }],
     ['unmerged version PR', { pull: { merged_at: null } }],
     ['different merge commit', { pull: { merge_commit_sha: 'other-commit' } }],
     [
       'fork version branch',
-      { pull: { head: { ref: 'changeset-release/main', repo: { full_name: 'other/lg-luma' } } } },
+      { pull: { head: { ref: 'changeset-release/main', repo: { full_name: 'other/sera' } } } },
     ],
     ['deleted head repository', { pull: { head: { ref: 'changeset-release/main', repo: null } } }],
-    [
-      'different base',
-      { pull: { base: { ref: 'develop', repo: { full_name: 'ecklf/lg-luma' } } } },
-    ],
+    ['different base', { pull: { base: { ref: 'develop', repo: { full_name: 'minux84/sera' } } } }],
     ['manual CI run', { event: { eventName: 'workflow_dispatch' } }],
     ['PR checks', { event: { eventName: 'pull_request' } }],
     ['other branch', { event: { ref: 'refs/heads/changeset-release/main' } }],

@@ -1,12 +1,12 @@
-/* Luma player: approved mockups Player / PlayerTracks. One padding of 88,
+/* Sera player: approved mockups Player / PlayerTracks. One padding of 88,
    right edge at 1832, round buttons 84 high, two states (grey / accent). */
 @font-face {
-  font-family: LumaHeading;
+  font-family: SeraHeading;
   src: url(fonts/heading.ttf);
   font-weight: 200 1000;
 }
 @font-face {
-  font-family: LumaBody;
+  font-family: SeraBody;
   src: url(fonts/body.ttf);
   font-weight: 200 800;
 }
@@ -27,7 +27,7 @@ body {
   overflow: hidden;
   background: #000;
   color: #fff;
-  font-family: LumaBody, sans-serif;
+  font-family: SeraBody, sans-serif;
   -webkit-user-select: none;
   cursor: default;
 }
@@ -68,13 +68,13 @@ video {
 #note h2 {
   margin: 0;
   font:
-    800 44px/1.1 LumaHeading,
+    800 44px/1.1 SeraHeading,
     sans-serif;
 }
 #note p {
   margin: 0;
   font:
-    500 25px LumaBody,
+    500 25px SeraBody,
     sans-serif;
   color: rgba(255, 255, 255, 0.7);
 }
@@ -91,7 +91,7 @@ video {
   background: rgba(0, 0, 0, 0.6);
   text-align: center;
   font:
-    700 38px/1.25 LumaBody,
+    700 38px/1.25 SeraBody,
     sans-serif;
   white-space: pre-line;
   transition: bottom 0.25s ease;
@@ -137,7 +137,7 @@ body.controls #controls {
   left: 88px;
   top: 72px;
   font:
-    600 18px LumaBody,
+    600 18px SeraBody,
     sans-serif;
   letter-spacing: 0.08em;
   color: rgba(255, 255, 255, 0.6);
@@ -162,7 +162,7 @@ body.controls #controls {
   width: 1300px;
   margin: 0;
   font:
-    800 52px/1.05 LumaHeading,
+    800 52px/1.05 SeraHeading,
     sans-serif;
   white-space: nowrap;
   overflow: hidden;
@@ -177,7 +177,7 @@ body.controls #controls {
   top: 170px;
   width: 1300px;
   font:
-    600 25px LumaBody,
+    600 25px SeraBody,
     sans-serif;
   color: rgba(255, 255, 255, 0.8);
   white-space: nowrap;
@@ -189,7 +189,7 @@ body.controls #controls {
   right: 88px;
   top: 72px;
   font:
-    700 44px LumaBody,
+    700 44px SeraBody,
     sans-serif;
   text-align: right;
 }
@@ -198,7 +198,7 @@ body.controls #controls {
   right: 88px;
   top: 134px;
   font:
-    500 22px LumaBody,
+    500 22px SeraBody,
     sans-serif;
   color: rgba(255, 255, 255, 0.7);
   text-align: right;
@@ -217,7 +217,7 @@ body.controls #controls {
   background: rgba(255, 255, 255, 0.09);
   border: 1px solid rgba(255, 255, 255, 0.11);
   font:
-    600 25px LumaBody,
+    600 25px SeraBody,
     sans-serif;
   color: #fff;
 }
@@ -316,7 +316,7 @@ body.controls #controls {
   border-radius: 12px;
   background: rgba(0, 0, 0, 0.7);
   font:
-    700 23px/38px LumaBody,
+    700 23px/38px SeraBody,
     sans-serif;
   transform: translateX(-50%);
 }
@@ -325,7 +325,7 @@ body.controls #controls {
   left: 88px;
   top: 874px;
   font:
-    600 25px LumaBody,
+    600 25px SeraBody,
     sans-serif;
 }
 #remain {
@@ -333,7 +333,7 @@ body.controls #controls {
   right: 88px;
   top: 874px;
   font:
-    600 25px LumaBody,
+    600 25px SeraBody,
     sans-serif;
   color: rgba(255, 255, 255, 0.7);
   text-align: right;
@@ -343,7 +343,7 @@ body.controls #controls {
   right: 88px;
   top: 792px;
   font:
-    700 23px LumaBody,
+    700 23px SeraBody,
     sans-serif;
 }
 
@@ -378,7 +378,7 @@ body.controls #controls {
   top: 40px;
   margin: 0;
   font:
-    800 44px/60px LumaHeading,
+    800 44px/60px SeraHeading,
     sans-serif;
 }
 #panelClose {
@@ -393,7 +393,7 @@ body.controls #controls {
   margin: 0 0 10px 24px;
   height: 23px;
   font:
-    600 18px LumaBody,
+    600 18px SeraBody,
     sans-serif;
   letter-spacing: 0.08em;
   color: rgba(255, 255, 255, 0.55);
@@ -407,7 +407,7 @@ body.controls #controls {
   display: flex;
   align-items: center;
   font:
-    500 26px LumaBody,
+    500 26px SeraBody,
     sans-serif;
   color: rgba(255, 255, 255, 0.9);
   white-space: nowrap;
@@ -455,12 +455,12 @@ body.controls #controls {
 }
 #badgeTime {
   font:
-    600 25px LumaBody,
+    600 25px SeraBody,
     sans-serif;
 }
 #badge span:last-child {
   font:
-    500 22px LumaBody,
+    500 22px SeraBody,
     sans-serif;
   color: rgba(255, 255, 255, 0.7);
 }
@@ -515,7 +515,7 @@ body.music #caption {
   left: 140px;
   top: 668px;
   font:
-    600 18px LumaBody,
+    600 18px SeraBody,
     sans-serif;
   letter-spacing: 0.08em;
   color: rgba(255, 255, 255, 0.55);
@@ -549,7 +549,7 @@ body.music #caption {
   width: 600px;
   margin: 0;
   font:
-    800 52px/1.08 LumaHeading,
+    800 52px/1.08 SeraHeading,
     sans-serif;
   white-space: nowrap;
   overflow: hidden;
@@ -561,7 +561,7 @@ body.music #caption {
   top: 768px;
   width: 600px;
   font:
-    600 27px LumaBody,
+    600 27px SeraBody,
     sans-serif;
   color: rgba(255, 255, 255, 0.8);
   white-space: nowrap;
@@ -622,7 +622,7 @@ body.music #caption {
   position: absolute;
   top: 864px;
   font:
-    600 23px LumaBody,
+    600 23px SeraBody,
     sans-serif;
   color: rgba(255, 255, 255, 0.75);
 }
@@ -655,7 +655,7 @@ body.music #caption {
   left: 844px;
   top: 120px;
   font:
-    600 18px LumaBody,
+    600 18px SeraBody,
     sans-serif;
   letter-spacing: 0.08em;
   color: rgba(255, 255, 255, 0.55);
@@ -679,7 +679,7 @@ body.music #caption {
   display: flex;
   align-items: center;
   font:
-    500 25px LumaBody,
+    500 25px SeraBody,
     sans-serif;
   color: rgba(255, 255, 255, 0.88);
 }

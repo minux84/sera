@@ -918,7 +918,7 @@ impl State {
             m.detail_at = m.shown;
             m.backdrop_at = Some(m.opened);
             // Desktop QA of the entrance: freeze it this many seconds in.
-            if let Some(at) = std::env::var("LUMA_MOVIE_PREVIEW_AT")
+            if let Some(at) = std::env::var("SERA_MOVIE_PREVIEW_AT")
                 .ok()
                 .and_then(|v| v.parse::<f32>().ok())
             {

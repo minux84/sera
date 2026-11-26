@@ -1,6 +1,6 @@
 //! Zero-RGB-copy hardware wallpaper for rooted webOS 5+ LG TVs.
 //! Online H.264 is demuxed, not decoded by the CPU; Starfish renders into an
-//! exported SDL video plane underneath Luma's transparent GLES foreground.
+//! exported SDL video plane underneath Sera's transparent GLES foreground.
 //! The code never downloads all 289 files or caches the entire video collection.
 #![cfg(all(feature = "webos", target_os = "linux", target_arch = "arm"))]
 use std::{
@@ -59,7 +59,7 @@ impl H264Tuning {
     fn load() -> Self {
         let mut tuning = Self::default();
         let Ok(content) =
-            std::fs::read_to_string("/media/developer/com.denisefremov.luma/video-tuning.json")
+            std::fs::read_to_string("/media/developer/it.bytebuilder.sera/video-tuning.json")
         else {
             return tuning;
         };
@@ -90,7 +90,7 @@ static TRANSITION_EPOCH: OnceLock<Instant> = OnceLock::new();
 pub fn log_transition_event(index: usize, event: &str) {
     let start = TRANSITION_EPOCH.get_or_init(Instant::now);
     let Ok(mut file) =
-        crate::logs::append("/media/developer/com.denisefremov.luma/luma-video-transitions.log")
+        crate::logs::append("/media/developer/it.bytebuilder.sera/sera-video-transitions.log")
     else {
         return;
     };
@@ -165,7 +165,7 @@ impl Player {
         let path = exe
             .parent()
             .ok_or("No application directory")?
-            .join("lib/libluma_hwplayer.so");
+            .join("lib/libsera_hwplayer.so");
         let c = CString::new(path.to_string_lossy().as_bytes()).map_err(|e| e.to_string())?;
         let lib = unsafe { libc::dlopen(c.as_ptr(), libc::RTLD_NOW | libc::RTLD_LOCAL) };
         if lib.is_null() {
@@ -180,13 +180,13 @@ impl Player {
             Ok(ptr)
         }
         let resolved = unsafe {
-            let a = function(lib, "luma_hw_open");
-            let b = function(lib, "luma_hw_feed");
-            let c = function(lib, "luma_hw_close");
-            let d = function(lib, "luma_hw_ended");
-            let e = function(lib, "luma_hw_frames_rendered");
-            let f = function(lib, "luma_hw_metrics");
-            let g = function(lib, "luma_hw_set_drop_threshold");
+            let a = function(lib, "sera_hw_open");
+            let b = function(lib, "sera_hw_feed");
+            let c = function(lib, "sera_hw_close");
+            let d = function(lib, "sera_hw_ended");
+            let e = function(lib, "sera_hw_frames_rendered");
+            let f = function(lib, "sera_hw_metrics");
+            let g = function(lib, "sera_hw_set_drop_threshold");
             match (a, b, c, d, e, f, g) {
                 (Ok(a), Ok(b), Ok(c), Ok(d), Ok(e), Ok(f), Ok(g)) => Ok((
                     std::mem::transmute::<*mut c_void, Open>(a),
@@ -317,8 +317,8 @@ impl Player {
         let demux = exe
             .parent()
             .ok_or("No application directory")?
-            .join("luma-demux");
-        let log = crate::logs::append("/media/developer/com.denisefremov.luma/luma-demux.log").ok();
+            .join("sera-demux");
+        let log = crate::logs::append("/media/developer/it.bytebuilder.sera/sera-demux.log").ok();
         let mut cmd = Command::new(demux);
         cmd.arg(if entry.source == "Amazon" {
             "h265"
@@ -330,7 +330,7 @@ impl Player {
         .stdout(Stdio::piped())
         .stderr(log.map_or_else(Stdio::null, Stdio::from));
         if entry.source != "Amazon" && H264Tuning::load().fixed_30fps {
-            cmd.env("LUMA_H264_FIXED_30", "1");
+            cmd.env("SERA_H264_FIXED_30", "1");
         }
         unsafe {
             use std::os::unix::process::CommandExt;
@@ -413,7 +413,7 @@ impl Player {
         if !url.starts_with("https://") || url.len() > 2048 || url.contains(['\n', '\r', '\0']) {
             return Err("Invalid streaming URL".into());
         }
-        let app = CString::new("com.denisefremov.luma").unwrap();
+        let app = CString::new("it.bytebuilder.sera").unwrap();
         let codec = if entry.source == "Amazon" {
             "H265"
         } else {
@@ -602,7 +602,7 @@ impl Player {
         self.child = Some(child);
         self.index = Some(index);
         eprintln!(
-            "Luma SMP hardware stream started: {} ({}); original video bits",
+            "Sera SMP hardware stream started: {} ({}); original video bits",
             index, entry.name
         );
         Ok(())

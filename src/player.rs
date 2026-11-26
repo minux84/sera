@@ -169,7 +169,7 @@ pub struct MusicSong {
 }
 
 /// Where the web player sends playback progress, and the series' other
-/// episodes it can switch to without asking Luma. Holds the token.
+/// episodes it can switch to without asking Sera. Holds the token.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Report {
     /// "jellyfin".

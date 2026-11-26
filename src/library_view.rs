@@ -297,7 +297,7 @@ fn grid(out: &mut Scene, state: &State, assets: &Assets, library: &Library) {
             let (title, hint) = match (library.games, library.tab_id()) {
                 (true, "recent") => (
                     "Nothing played yet",
-                    "Games you start from Luma show up here.",
+                    "Games you start from Sera show up here.",
                 ),
                 (true, "favorites") => (
                     "No favorites yet",

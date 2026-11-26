@@ -1,3 +1,3 @@
 #!/bin/sh
-echo "Luma: system takeover and autostart are intentionally disabled."
+echo "Sera: system takeover and autostart are intentionally disabled."
 exit 1

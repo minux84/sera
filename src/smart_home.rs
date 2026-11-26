@@ -635,7 +635,7 @@ pub(crate) fn blur_snapshot(data: &[u8]) -> Option<Vec<u8>> {
 /// One line per tab view change, so a missing camera can be traced on the TV.
 fn log_view(visible: bool, cameras: &[String]) {
     use std::io::Write;
-    if let Ok(mut file) = crate::logs::append("/tmp/luma-ha-view.log") {
+    if let Ok(mut file) = crate::logs::append("/tmp/sera-ha-view.log") {
         let _ = writeln!(file, "visible={visible} cameras={}", cameras.join(","));
     }
 }
@@ -798,7 +798,7 @@ mod tests {
     #[test]
     fn sign_in_survives_loosened_file_mode() {
         use std::os::unix::fs::PermissionsExt;
-        let dir = std::env::temp_dir().join(format!("luma-auth-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("sera-auth-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("ha-auth.json");
         std::fs::write(
@@ -815,7 +815,7 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn auth_save_recovers_from_a_stale_temporary() {
-        let dir = std::env::temp_dir().join(format!("luma-auth-stale-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("sera-auth-stale-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("ha-auth.json");
         std::fs::write(path.with_extension("json.tmp"), b"left by a power cut").unwrap();

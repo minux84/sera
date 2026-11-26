@@ -120,7 +120,7 @@ fn reply(stream: &mut TcpStream, status: &'static str, page: &str) {
 }
 fn token_form() -> Form {
     Form {
-        title: "Connect Luma to Home Assistant".into(),
+        title: "Connect Sera to Home Assistant".into(),
         hint: "Enter your Home Assistant address and long-lived access token on your phone.".into(),
         help: None,
         fields: vec![
@@ -140,7 +140,7 @@ fn token_form() -> Form {
             },
         ],
         submit_label: "Connect TV".into(),
-        success_title: "Luma is connected".into(),
+        success_title: "Sera is connected".into(),
         success_message: "You can close this page.".into(),
         route: "/token".into(),
     }
@@ -222,7 +222,7 @@ pub fn start(
                 reply(
                     &mut stream,
                     "200 OK",
-                    &html_page("Luma Home Assistant", "Scan the QR on your TV to sign in."),
+                    &html_page("Sera Home Assistant", "Scan the QR on your TV to sign in."),
                 );
             } else if method == "GET" && route.starts_with("/token?") {
                 let query = route.split_once('?').map(|(_, query)| query).unwrap_or("");
@@ -254,7 +254,7 @@ pub fn start(
                                     &mut stream,
                                     "200 OK",
                                     &html_page(
-                                        "Luma is connected",
+                                        "Sera is connected",
                                         "<p>You can close this page.</p>",
                                     ),
                                 );

@@ -66,9 +66,9 @@ struct Cinema {
    usleep(150000);
   }
  }
- // Diagnostic trail next to Luma's other logs. Never receives URLs.
+ // Diagnostic trail next to Sera's other logs. Never receives URLs.
  static void note(const char *line){
-  if(FILE *f=fopen("/media/developer/com.denisefremov.luma/luma-cinema.log","a")){fprintf(f,"native %s\n",line);fclose(f);}
+  if(FILE *f=fopen("/media/developer/it.bytebuilder.sera/sera-cinema.log","a")){fprintf(f,"native %s\n",line);fclose(f);}
  }
  // How the video surface is placed; a file switch lets us compare on the TV
  // without a rebuild: both (default), crop, set (2.2.81 behaviour), none.
@@ -76,7 +76,7 @@ struct Cinema {
  // sources showed); setting the exported window as well shows every size.
  static std::string mode(){
   std::string m="both";
-  if(FILE *f=fopen("/media/developer/com.denisefremov.luma/cinema-window","r")){
+  if(FILE *f=fopen("/media/developer/it.bytebuilder.sera/cinema-window","r")){
    char buf[16]={0};
    if(fgets(buf,sizeof buf,f)){m=buf;while(!m.empty()&&(m.back()=='\n'||m.back()==' '))m.pop_back();}
    fclose(f);
@@ -94,7 +94,7 @@ struct Cinema {
   if(fh>h){fh=h;fw=static_cast<int>(static_cast<int64_t>(h)*video_w/video_h);}
   return SDL_Rect{(w-fw)/2,(h-fh)/2,fw,fh};
  }
- // Map the frame onto the Luma window, like Kodi's set_crop_region;
+ // Map the frame onto the Sera window, like Kodi's set_crop_region;
  // destination is in the window's own coordinates.
  void place(){
   if(window.empty())return;
@@ -127,7 +127,7 @@ struct Cinema {
    if(id)window=id;
   }
   place();
-  std::string payload="{\"option\":{\"appId\":\"com.denisefremov.luma\"";
+  std::string payload="{\"option\":{\"appId\":\"it.bytebuilder.sera\"";
   if(!window.empty())payload+=",\"windowId\":\""+window+"\"";
   payload+="}}";
   state.store(1);position.store(0);duration.store(0);base_position=0;
@@ -168,30 +168,30 @@ struct Cinema {
  }
 };
 extern "C" {
-void *luma_cinema_create(){try{return new Cinema();}catch(...){return nullptr;}}
-void luma_cinema_destroy(void *p){delete static_cast<Cinema*>(p);}
-void luma_cinema_video_size(void *p,int w,int h){if(auto *c=static_cast<Cinema*>(p)){std::lock_guard<std::mutex> guard(c->mu);c->video_w=w;c->video_h=h;}}
-int luma_cinema_open(void *p,const char *uri){return p?static_cast<Cinema*>(p)->open(uri):0;}
-int luma_cinema_control(void *p,int cmd,int64_t value){return p?static_cast<Cinema*>(p)->control(cmd,value):0;}
-int luma_cinema_state(void *p){return p?static_cast<Cinema*>(p)->state.load():-1;}
-int64_t luma_cinema_position(void *p){return p?static_cast<Cinema*>(p)->pos():0;}
-int64_t luma_cinema_duration(void *p){return p?static_cast<Cinema*>(p)->duration.load():0;}
+void *sera_cinema_create(){try{return new Cinema();}catch(...){return nullptr;}}
+void sera_cinema_destroy(void *p){delete static_cast<Cinema*>(p);}
+void sera_cinema_video_size(void *p,int w,int h){if(auto *c=static_cast<Cinema*>(p)){std::lock_guard<std::mutex> guard(c->mu);c->video_w=w;c->video_h=h;}}
+int sera_cinema_open(void *p,const char *uri){return p?static_cast<Cinema*>(p)->open(uri):0;}
+int sera_cinema_control(void *p,int cmd,int64_t value){return p?static_cast<Cinema*>(p)->control(cmd,value):0;}
+int sera_cinema_state(void *p){return p?static_cast<Cinema*>(p)->state.load():-1;}
+int64_t sera_cinema_position(void *p){return p?static_cast<Cinema*>(p)->pos():0;}
+int64_t sera_cinema_duration(void *p){return p?static_cast<Cinema*>(p)->duration.load():0;}
 // The C ABI exposes no video-frame callback. Do not invent first-frame timestamps.
-int64_t luma_cinema_first_ms(void *){return -1;}
+int64_t sera_cinema_first_ms(void *){return -1;}
 
 // Exported video surface helpers for the LS2 (com.webos.media) path.
 // The window id is copied by the caller; destroy with the same id.
-const char *luma_cinema_window_create(){
+const char *sera_cinema_window_create(){
  return SDL_webOSCreateExportedWindow(SDL_WEBOS_EXPORTED_WINDOW_TYPE_VIDEO);
 }
-// Map the whole video frame (vw x vh) onto the whole Luma window, as Kodi's
+// Map the whole video frame (vw x vh) onto the whole Sera window, as Kodi's
 // set_crop_region does. Destination is in the parent surface's coordinates.
-int luma_cinema_window_fit(const char *id,int vw,int vh){
+int sera_cinema_window_fit(const char *id,int vw,int vh){
  if(!id||!id[0]||vw<=0||vh<=0)return 0;
  int ww=1920,wh=1080;
  if(SDL_Window *w=SDL_GetWindowFromID(1))SDL_GetWindowSize(w,&ww,&wh);
  SDL_Rect org={0,0,vw,vh},src={0,0,vw,vh},dst={0,0,ww,wh};
  return SDL_webOSExportedSetCropRegion(id,&org,&src,&dst)?1:0;
 }
-void luma_cinema_window_destroy(const char *id){if(id&&id[0])SDL_webOSDestroyExportedWindow(id);}
+void sera_cinema_window_destroy(const char *id){if(id&&id[0])SDL_webOSDestroyExportedWindow(id);}
 }

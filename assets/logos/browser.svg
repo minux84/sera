@@ -1,4 +1,4 @@
-<!-- Original Luma browser artwork, MIT. Filled globe and navigation pointer. -->
+<!-- Original Sera browser artwork, MIT. Filled globe and navigation pointer. -->
 <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
   <defs>
     <linearGradient id="orb" x1="27" y1="20" x2="87" y2="92" gradientUnits="userSpaceOnUse">

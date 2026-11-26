@@ -1,4 +1,4 @@
-//! Diagnostic logs live on TV flash and Luma runs around the clock, so an
+//! Diagnostic logs live on TV flash and Sera runs around the clock, so an
 //! append-only log must never grow without bound. Past `MAX_BYTES` the file
 //! becomes `<name>.prev.log` (one backup, replacing the older one) and a fresh
 //! file is started: at most ~2 MiB per log on disk.
@@ -18,7 +18,7 @@ pub fn append(path: impl AsRef<Path>) -> std::io::Result<File> {
     OpenOptions::new().create(true).append(true).open(path)
 }
 
-/// "luma-demux.log" → "luma-demux.prev.log", as the native metrics log does.
+/// "sera-demux.log" → "sera-demux.prev.log", as the native metrics log does.
 fn backup(path: &Path) -> PathBuf {
     path.with_extension("prev.log")
 }
@@ -30,10 +30,10 @@ mod tests {
 
     #[test]
     fn rotates_once_over_the_cap_and_keeps_one_backup() {
-        let directory = std::env::temp_dir().join(format!("luma-logs-{}", std::process::id()));
+        let directory = std::env::temp_dir().join(format!("sera-logs-{}", std::process::id()));
         std::fs::create_dir_all(&directory).unwrap();
-        let path = directory.join("luma-test.log");
-        assert_eq!(backup(&path), directory.join("luma-test.prev.log"));
+        let path = directory.join("sera-test.log");
+        assert_eq!(backup(&path), directory.join("sera-test.prev.log"));
 
         append(&path).unwrap().write_all(b"small\n").unwrap();
         append(&path).unwrap().write_all(b"more\n").unwrap();

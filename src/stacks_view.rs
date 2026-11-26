@@ -24,9 +24,9 @@ fn rows(state: &State) -> Vec<(String, &'static str, CardShape, Vec<StackItem>, 
             crate::stacks::has_library(&stack.source),
         ));
     }
-    // Desktop-only design QA: LUMA_STACK_PREVIEW=1 shows placeholder "New" and "Popular" rows.
+    // Desktop-only design QA: SERA_STACK_PREVIEW=1 shows placeholder "New" and "Popular" rows.
     #[cfg(debug_assertions)]
-    if rows.is_empty() && std::env::var_os("LUMA_STACK_PREVIEW").is_some() {
+    if rows.is_empty() && std::env::var_os("SERA_STACK_PREVIEW").is_some() {
         rows.push((
             "Games".into(),
             "Moonlight",
@@ -186,7 +186,7 @@ fn stack_title(out: &mut Scene, assets: &Assets, name: &str, source: &str, y: f3
     }
     let head = heading_fixed(assets, 31., 700).tracking(-0.01);
     let x = 84. + assets.width(name, head);
-    let variant = std::env::var("LUMA_SOURCE_STYLE").unwrap_or_default();
+    let variant = std::env::var("SERA_SOURCE_STYLE").unwrap_or_default();
     match variant.as_str() {
         "b" => {
             let style = TextStyle::new(20.).weight(600);

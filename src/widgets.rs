@@ -779,7 +779,7 @@ fn get_json(agent: &ureq::Agent, url: &str) -> Option<Value> {
     let mut response = agent
         .get(url)
         .header("Accept", "application/json")
-        .header("User-Agent", "LumaNative")
+        .header("User-Agent", "SeraNative")
         .call()
         .ok()?;
     if !response.status().is_success() {

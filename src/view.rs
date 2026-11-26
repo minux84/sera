@@ -1055,7 +1055,7 @@ pub fn scene_with_pill(
 }
 
 pub(crate) fn contrast_text_for_accent(a: u32, b: u32) -> Color {
-    let luma = |v: u32| {
+    let sera = |v: u32| {
         let channel = |shift| {
             let srgb = ((v >> shift) & 0xffu32) as f32 / 255.;
             if srgb <= 0.04045 {
@@ -1066,7 +1066,7 @@ pub(crate) fn contrast_text_for_accent(a: u32, b: u32) -> Color {
         };
         0.2126 * channel(16) + 0.7152 * channel(8) + 0.0722 * channel(0)
     };
-    let mean = (luma(a) + luma(b)) * 0.5;
+    let mean = (sera(a) + sera(b)) * 0.5;
     if mean > 0.21 { c(0x121519, 1.) } else { WHITE }
 }
 
@@ -2872,7 +2872,7 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
         return;
     }
     let (title, icon, detail) = match state.section {
-        0 => ("General", "settings", "Personalize Luma"),
+        0 => ("General", "settings", "Personalize Sera"),
         WEATHER_SECTION => ("Weather", "clock", "Local conditions on Home"),
         crate::state::INPUTS_SECTION => ("Inputs", "tv", "Manage connected devices"),
         crate::state::SMARTHOME_SECTION => ("Smart Home", "tv", "Home Assistant devices"),
@@ -3124,7 +3124,7 @@ fn root_feature_rows(
         Target::Setting(9),
         Rect::new(x, y, w, 104.),
         tvos_settings_view::CellContent {
-            name: "Open Luma at power on",
+            name: "Open Sera at power on",
             value: Some(state_text(root.wake)),
             desc: Some("Instead of the last input or LG Home"),
             chevron: false,
@@ -4361,7 +4361,7 @@ fn smart_home_view(out: &mut Scene, state: &State, assets: &Assets) {
             } else {
                 (
                     "Can't reach Home Assistant",
-                    "Luma keeps retrying. Check that the server is on.",
+                    "Sera keeps retrying. Check that the server is on.",
                 )
             }
         } else {
@@ -4513,7 +4513,7 @@ fn smart_home_view(out: &mut Scene, state: &State, assets: &Assets) {
     }
     let mut y = chip_y + 84. + 40.;
 
-    // Scenes: one row of buttons in the two Luma states (grey, accent when focused).
+    // Scenes: one row of buttons in the two Sera states (grey, accent when focused).
     if !scenes.is_empty() {
         let mut x = SMART_X;
         let style = text(25., 600, -0.01);

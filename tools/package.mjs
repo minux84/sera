@@ -11,16 +11,16 @@ const manifest = JSON.parse(await fs.readFile(path.join(root, 'appinfo.json'), '
 const project = JSON.parse(await fs.readFile(path.join(root, 'package.json'), 'utf8'));
 if (
   project.version !== manifest.version ||
-  manifest.id !== 'com.denisefremov.luma' ||
+  manifest.id !== 'it.bytebuilder.sera' ||
   manifest.type !== 'native' ||
-  manifest.main !== 'luma'
+  manifest.main !== 'sera'
 ) {
   throw new Error(
-    'Native package metadata must use com.denisefremov.luma, main luma, and synchronized versions.',
+    'Native package metadata must use it.bytebuilder.sera, main sera, and synchronized versions.',
   );
 }
-const profile = process.env.LUMA_PROFILE || 'release';
-const binary = path.join(root, 'target/armv7-unknown-linux-gnueabi', profile, 'luma');
+const profile = process.env.SERA_PROFILE || 'release';
+const binary = path.join(root, 'target/armv7-unknown-linux-gnueabi', profile, 'sera');
 const bytes = await fs.readFile(binary);
 if (
   bytes.length < 52 ||
@@ -60,7 +60,7 @@ for (const file of vectorManifest.assets) {
   const mesh = await fs.readFile(path.join(out, 'assets', file));
   if (
     mesh.length < 20 ||
-    mesh.subarray(0, 8).toString() !== 'LUMAVEC1' ||
+    mesh.subarray(0, 8).toString() !== 'SERAVEC1' ||
     mesh.readUInt32LE(16) === 0 ||
     mesh.readUInt32LE(16) % 3 !== 0 ||
     mesh.length !== 20 + mesh.readUInt32LE(16) * 36
@@ -105,8 +105,8 @@ await fs.copyFile(path.join(root, 'license'), path.join(stage, 'LICENSE'));
 await fs.copyFile(path.join(root, 'assets.md'), path.join(stage, 'ASSETS.md'));
 await fs.mkdir(path.join(stage, 'lib'));
 const hwDir = path.join(out, 'hardware-wallpaper');
-await fs.copyFile(path.join(hwDir, 'luma-demux'), path.join(stage, 'luma-demux'));
-await fs.chmod(path.join(stage, 'luma-demux'), 0o755);
+await fs.copyFile(path.join(hwDir, 'sera-demux'), path.join(stage, 'sera-demux'));
+await fs.chmod(path.join(stage, 'sera-demux'), 0o755);
 async function copyLibrary(directory, name) {
   const library = await fs.readFile(path.join(directory, name));
   if (
@@ -135,8 +135,8 @@ if (!(await fs.readdir(path.join(stage, 'lib'))).includes(sdlName)) {
   const runtime = await prepareWebosRuntime();
   await copyLibrary(path.join(runtime, 'lib'), sdlName);
 }
-await copyLibrary(hwDir, 'libluma_hwplayer.so');
-await copyLibrary(hwDir, 'libluma_cinema.so');
+await copyLibrary(hwDir, 'libsera_hwplayer.so');
+await copyLibrary(hwDir, 'libsera_cinema.so');
 await fs.cp(path.join(root, 'assets/licenses'), path.join(stage, 'licenses'), { recursive: true });
 await fs.writeFile(path.join(stage, 'appinfo.json'), `${JSON.stringify(manifest, null, 2)}\n`);
 const state = path.join(out, 'cli-state');

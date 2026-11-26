@@ -1,11 +1,11 @@
-# lg-luma
+# sera
 
 ## 2.2.2
 
 ### Patch Changes
 
 - 072b7e9: Show installed app icons as soon as they are decoded instead of one per idle wake-up.
-- fed795c: Keep decoded app icons across the automatic inventory refreshes at startup and whenever Luma becomes visible, reading an icon again only when its app's version or icon paths change. Refresh apps still reloads every icon.
+- fed795c: Keep decoded app icons across the automatic inventory refreshes at startup and whenever Sera becomes visible, reading an icon again only when its app's version or icon paths change. Refresh apps still reloads every icon.
 - 969a6fd: Keep the neutral card colour for transparent app icons whose logo reaches the edges, instead of filling the card with the logo's own colour.
 
 ## 2.2.1

@@ -38,7 +38,7 @@ impl StillLoader {
         let (done, replies) = mpsc::channel();
         // If the thread cannot start, sends fail and stills decode inline.
         let _ = std::thread::Builder::new()
-            .name("luma-stills".into())
+            .name("sera-stills".into())
             .spawn(move || {
                 for (path, frost) in jobs {
                     let decoded = open_image(&path).ok().map(|image| {
@@ -80,7 +80,7 @@ impl PosterLoader {
         for n in 0..2 {
             let (jobs, done) = (jobs.clone(), done.clone());
             let _ = std::thread::Builder::new()
-                .name(format!("luma-covers-{n}"))
+                .name(format!("sera-covers-{n}"))
                 .spawn(move || {
                     loop {
                         let next = jobs.lock().unwrap().recv();
@@ -230,7 +230,7 @@ impl Drop for Procedural {
 }
 
 struct Glyph {
-    geometry: Vec<luma_vector_geometry::Vertex>,
+    geometry: Vec<sera_vector_geometry::Vertex>,
     frame: u64,
 }
 
@@ -421,11 +421,11 @@ pub struct Renderer {
     frame: u64,
     stats: RenderStats,
     pub info: GraphicsInfo,
-    // Diagnostic-only layer mask from LUMA_PROF_SKIP (1 shapes, 2 textures,
+    // Diagnostic-only layer mask from SERA_PROF_SKIP (1 shapes, 2 textures,
     // 4 text, 8 vectors, 16 full-screen underlays). Zero in normal sessions.
     prof_skip: u8,
     prof_finish: bool,
-    // LUMA_PROF_OLD: draw without the fill-rate savings, for A/B timing.
+    // SERA_PROF_OLD: draw without the fill-rate savings, for A/B timing.
     prof_old: bool,
     // Areas that opaque draws later in this frame will overwrite (see render).
     holes: Vec<Rect>,
@@ -599,12 +599,12 @@ impl Renderer {
                 max_viewport,
                 fragment_highp,
             },
-            prof_skip: std::env::var("LUMA_PROF_SKIP")
+            prof_skip: std::env::var("SERA_PROF_SKIP")
                 .ok()
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(0),
-            prof_finish: std::env::var_os("LUMA_PROF_FINISH").is_some_and(|v| v == "1"),
-            prof_old: std::env::var_os("LUMA_PROF_OLD").is_some_and(|v| v == "1"),
+            prof_finish: std::env::var_os("SERA_PROF_FINISH").is_some_and(|v| v == "1"),
+            prof_old: std::env::var_os("SERA_PROF_OLD").is_some_and(|v| v == "1"),
             holes: Vec::new(),
             frost_pixels: HashMap::new(),
             cameras: HashMap::new(),
@@ -645,7 +645,7 @@ impl Renderer {
         }
     }
 
-    fn glyph(&mut self, c: char, font: u16) -> Result<&[luma_vector_geometry::Vertex], String> {
+    fn glyph(&mut self, c: char, font: u16) -> Result<&[sera_vector_geometry::Vertex], String> {
         let key = (c, font);
         if !self.glyphs.contains_key(&key) {
             let geometry = self.fonts[&font].geometry(c)?;
@@ -665,7 +665,7 @@ impl Renderer {
 
     fn trim_text_geometry(&mut self) {
         let glyph_bytes =
-            |glyph: &Glyph| glyph.geometry.len() * size_of::<luma_vector_geometry::Vertex>();
+            |glyph: &Glyph| glyph.geometry.len() * size_of::<sera_vector_geometry::Vertex>();
         let mut bytes: usize = self.glyphs.values().map(glyph_bytes).sum();
         if bytes > GLYPH_GEOMETRY_BUDGET || self.glyphs.len() > 4096 {
             let mut old: Vec<_> = self
@@ -1167,7 +1167,7 @@ impl Renderer {
                     }
                 }
                 Err(error) => {
-                    eprintln!("Luma glyph {c:?}: {error}");
+                    eprintln!("Sera glyph {c:?}: {error}");
                     failures += 1;
                 }
             }
@@ -1178,7 +1178,7 @@ impl Renderer {
             match vector::Mesh::upload(1., 1., &vertices) {
                 Ok(mesh) => Some(mesh),
                 Err(error) => {
-                    eprintln!("Luma text: {error}");
+                    eprintln!("Sera text: {error}");
                     failures += 1;
                     None
                 }
@@ -2194,7 +2194,7 @@ impl Renderer {
         // Never incur synchronization stalls in a normal TV session.
         let trace_gl = self.prof_finish
             || (cfg!(feature = "webos")
-                && std::path::Path::new("/media/developer/com.denisefremov.luma/profile-gl")
+                && std::path::Path::new("/media/developer/it.bytebuilder.sera/profile-gl")
                     .exists());
         self.stats.cached_effect = hybrid && !refresh;
         let mut original_fbo = 0;
@@ -2436,7 +2436,7 @@ impl Renderer {
         self.stats.draw_calls = self.batches.len();
         self.stats.cpu_submission_ms = started.elapsed().as_secs_f64() * 1000.;
         if self.prof_finish
-            && (self.frame.is_multiple_of(30) || std::env::var_os("LUMA_PROF_EVERY").is_some())
+            && (self.frame.is_multiple_of(30) || std::env::var_os("SERA_PROF_EVERY").is_some())
         {
             // Logical fill area per layer kind, in screens (1.0 = one full 1920x1080).
             let mut fill = [0f32; 5];
@@ -2465,10 +2465,10 @@ impl Renderer {
                         }
                         fill[slot] += area / (1920. * 1080.);
                         if area > 0.002 * 1920. * 1080.
-                            && std::env::var_os("LUMA_PROF_DUMP").is_some()
+                            && std::env::var_os("SERA_PROF_DUMP").is_some()
                         {
                             eprintln!(
-                                "LUMA_QUAD slot={slot} x={:.0} y={:.0} w={w:.0} h={h:.0} r={:.0} border={:.0} rgba=[{:.2},{:.2},{:.2},{:.2}] screens={:.2}",
+                                "SERA_QUAD slot={slot} x={:.0} y={:.0} w={w:.0} h={h:.0} r={:.0} border={:.0} rgba=[{:.2},{:.2},{:.2},{:.2}] screens={:.2}",
                                 v[0],
                                 v[1],
                                 v[12],
@@ -2484,7 +2484,7 @@ impl Renderer {
                 }
             }
             eprintln!(
-                "LUMA_FILL frame={} shapes={:.2} textures={:.2} underlay={:.2} batches={}",
+                "SERA_FILL frame={} shapes={:.2} textures={:.2} underlay={:.2} batches={}",
                 self.frame,
                 fill[0],
                 fill[1],
@@ -2494,7 +2494,7 @@ impl Renderer {
         }
         if trace_gl && self.frame.is_multiple_of(30) {
             eprintln!(
-                "LUMA_GL_PROFILE frame={} target={}x{} effect_ms={:.3} crisp_ms={:.3} total_ms={:.3} cached={} calls={}",
+                "SERA_GL_PROFILE frame={} target={}x{} effect_ms={:.3} crisp_ms={:.3} total_ms={:.3} cached={} calls={}",
                 self.frame,
                 width,
                 height,
@@ -2775,14 +2775,14 @@ fn camera_key(path: &str) -> Option<&str> {
 /// Seconds a freshly decoded title-card picture takes to fade in.
 const IMAGE_FADE: f32 = 0.3;
 
-/// One line per decoded title-card picture in luma-images.log next to the
+/// One line per decoded title-card picture in sera-images.log next to the
 /// poster cache, so slow banners on the TV can be measured, not guessed.
 fn log_image_timing(path: &str, started: std::time::Instant, decoded: Option<&image::RgbaImage>) {
     use std::io::Write;
     let Some(folder) = Path::new(path).parent().and_then(Path::parent) else {
         return;
     };
-    let Ok(mut log) = crate::logs::append(folder.join("luma-images.log")) else {
+    let Ok(mut log) = crate::logs::append(folder.join("sera-images.log")) else {
         return;
     };
     let size = decoded.map_or("failed".to_owned(), |i| {
@@ -2937,7 +2937,7 @@ fn load_font(directory: &Path, id: u16) -> Result<Font, String> {
     let font = Font::from_bytes(bytes).map_err(|e| format!("Font {}: {e}", path.display()))?;
     if cfg!(feature = "webos") {
         eprintln!(
-            "Luma font: {name} loaded in {} ms",
+            "Sera font: {name} loaded in {} ms",
             started.elapsed().as_millis()
         );
     }
@@ -2979,9 +2979,9 @@ fn frost_pixels(image: &image::DynamicImage) -> image::RgbaImage {
     let mut blurred = image::imageops::blur(&small, 3.);
     for pixel in blurred.pixels_mut() {
         let [r, g, b, _] = pixel.0.map(f32::from);
-        let luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        let sera = 0.2126 * r + 0.7152 * g + 0.0722 * b;
         for (channel, value) in pixel.0[..3].iter_mut().zip([r, g, b]) {
-            *channel = (luma + (value - luma) * 1.7).clamp(0., 255.) as u8;
+            *channel = (sera + (value - sera) * 1.7).clamp(0., 255.) as u8;
         }
     }
     blurred

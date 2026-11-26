@@ -1,4 +1,4 @@
-# Luma development
+# Sera development
 
 ## Layout
 
@@ -18,7 +18,7 @@ dist/                        Generated ARM IPK, checksum and Homebrew feed
 
 React, JSX, Vite, browser tests and web rendering are no longer part of the project. Node/pnpm
 remain build/deployment tools for Sharp, the webOS CLI and formatting/linting. The installed app
-is the Rust executable `luma`, with app ID `com.denisefremov.luma`.
+is the Rust executable `sera`, with app ID `it.bytebuilder.sera`.
 
 ## Toolchain and commands
 
@@ -50,7 +50,7 @@ including `armv7-unknown-linux-gnueabi` for TV builds. No browser installation i
 | `pnpm deploy:root`        | Build, then install/launch on a rooted TV over root SSH    |
 | `pnpm deploy:root:fast`   | Same as `deploy:root`, using the `release-dev` build       |
 | `pnpm install:root`       | Install/launch the existing `dist/` IPKs over root SSH     |
-| `pnpm restart:root`       | Close and relaunch the installed Luma over root SSH        |
+| `pnpm restart:root`       | Close and relaunch the installed Sera over root SSH        |
 | `pnpm check`              | Oxlint and workspace Clippy, without executing tests       |
 | `pnpm format:check`       | Rust and tooling/document formatting checks                |
 | `pnpm test`               | Release-tooling and Rust workspace unit tests              |
@@ -211,7 +211,7 @@ The gallery also runs as part of `pnpm test:smoke`. Asset source/licence details
 
 Live TV (`com.webos.app.livetv`) and Web Browser (`com.webos.app.browser`) also have dedicated
 SVG-backed demo cards: a blue/cyan TV display with a live indicator, and a matching globe with a
-navigation pointer. Both are original Luma vector artwork. The existing card caption remains available when
+navigation pointer. Both are original Sera vector artwork. The existing card caption remains available when
 names are visible. `Brand::artwork_size()` sets optical sizing per brand, keeping heavy wordmarks
 such as Hulu, Joyn and Plex closer to the visual weight of Apple TV, YouTube, Das Erste and ARTE.
 
@@ -285,7 +285,7 @@ restarted `surface-manager-daemon.service`. Systemd scheduled restoration after 
 | Visible picture              | Normal             | Flickering lines and corruption |
 
 Restoring the original configuration returned the picture to normal. This was a system compositor
-experiment, not a supported Luma setting or installation procedure.
+experiment, not a supported Sera setting or installation procedure.
 
 **Mode acceptance, a 4K drawable or screenshot, and even matching 4K framebuffer/plane/CRTC
 dimensions do not prove correct panel presentation.** Check the visible output and use a
@@ -310,7 +310,7 @@ distinguish 1080p graphics from 4K video on UHD TVs. Native media players can ro
 through a separate video plane while drawing their UI at 1080p. For example,
 [PlxNative documents its default 1080p UI drawable](https://github.com/GLinnik21/plx-native/blob/13bed25004df4c89f8bcba9558b571b8ed962bd0/rust-modules/base/src/surface.rs#L10-L25)
 alongside 4K video support. That media path does not demonstrate a usable 4K OpenGL graphics path
-for Luma; bypassing the browser does not by itself reconfigure LG's graphics output pipeline.
+for Sera; bypassing the browser does not by itself reconfigure LG's graphics output pipeline.
 
 ### Frame profiling
 
@@ -329,21 +329,21 @@ via a corepack shim in `.build/bin`, the node modules and the webOS SDK. Each ne
 
 `pnpm deploy:root -- --host <TV-IP>` packages, uploads both IPKs over SSH (`root`, port 22) and
 installs them through `appInstallService/dev/install`, the path Homebrew Channel uses, then
-relaunches Luma. No ares profile or Developer Mode app is needed. Put defaults in the
-git-ignored `.env.tv` (`LUMA_TV_HOST`, `LUMA_TV_PORT`, `LUMA_TV_USER`, `LUMA_TV_KEY`). Options:
+relaunches Sera. No ares profile or Developer Mode app is needed. Put defaults in the
+git-ignored `.env.tv` (`SERA_TV_HOST`, `SERA_TV_PORT`, `SERA_TV_USER`, `SERA_TV_KEY`). Options:
 `--key <file>`, `--no-player`, `--no-launch`, `--restart` (relaunch only). A password (often `alpine`) is asked once per run.
 
 ## TV startup diagnostics
 
 SAM passes launch metadata as a JSON object in `argv[1]`. The CLI skips that object while leaving
 the original process arguments available to SDL/libhelpers. To expose the actual developer-mode
-sandbox's stdout/stderr, close Luma and run in the TV's root SSH shell:
+sandbox's stdout/stderr, close Sera and run in the TV's root SSH shell:
 
 ```sh
-APP=/media/developer/apps/usr/palm/applications/com.denisefremov.luma
+APP=/media/developer/apps/usr/palm/applications/it.bytebuilder.sera
 XDG_RUNTIME_DIR=/tmp/xdg RUST_BACKTRACE=1 /usr/bin/jailer \
-  -t native_devmode -i com.denisefremov.luma -p "$APP" \
-  "$APP/luma" '{"@system_native_app":true,"nid":"com.denisefremov.luma"}'
+  -t native_devmode -i it.bytebuilder.sera -p "$APP" \
+  "$APP/sera" '{"@system_native_app":true,"nid":"it.bytebuilder.sera"}'
 ```
 
 Startup prints accepted launch parameters, SDL driver, actual sample count, cumulative stage
@@ -364,9 +364,9 @@ failures preserve the last valid inputs. No failed inventory read substitutes de
 
 ### Optional native Home integration
 
-`tv/home.sh` and `tv/home.cjs` are packaged beside `luma`. They are a root-only, explicit integration
+`tv/home.sh` and `tv/home.cjs` are packaged beside `sera`. They are a root-only, explicit integration
 for webOS 10/25 and 11/26. `enable` stages a native manifest with ID `com.webos.app.home` and
-symlinks to the installed executable, libraries and assets under `/var/lib/luma-home/app`, then
+symlinks to the installed executable, libraries and assets under `/var/lib/sera-home/app`, then
 bind-mounts it over `/usr/palm/applications/com.webos.app.home`. SAM rereads that one app through
 `blockSystemApp` followed by `releaseBlockSystemApp`, including `forceBlockSystemApp: false` when
 the TV schema requires it. The script verifies the reported manifest before stopping the previous
@@ -383,15 +383,15 @@ proceeds. `n`/`N` or end-of-input cancels, and other input repeats the prompt. T
 
 The native CLI accepts SAM's Home `nid` and gives SDL the matching Home surface identity. The
 executable itself stays at its installed path for LS2 authentication, `$ORIGIN/lib`, asset discovery
-and preference selection. Opening Luma's normal tile while the Home mount is active redirects to
+and preference selection. Opening Sera's normal tile while the Home mount is active redirects to
 the Home instance. The scripts do not create a browser wrapper or change the package's app ID.
 
-`64-luma-home` reapplies the mount from a detached boot hook. The existing TV Home Auto Launch
+`64-sera-home` reapplies the mount from a detached boot hook. The existing TV Home Auto Launch
 and Quick Start+ settings determine whether power-on opens Home. Until the hook applies, LG Home
 can still appear. This integration does not change those settings or install a remote-key filter.
 `disable` (also `restore`) removes the mount, refreshes LG's manifest, stops the native Home
-instance and removes the boot hook. The copied restore scripts remain in `/var/lib/luma-home`
-even if the installed package is removed. Disable the standalone `65-luma` cold-boot hook before
+instance and removes the boot hook. The copied restore scripts remain in `/var/lib/sera-home`
+even if the installed package is removed. Disable the standalone `65-sera` cold-boot hook before
 enabling this integration.
 
 Build and script checks cannot establish native Home compatibility. Manually verify Home, Back
@@ -422,8 +422,8 @@ on the persistent developer partition, not the reboot-cleared `/tmp`. No setting
 in `/tmp` and no system/app-payload permissions are widened. Existing JSON preferences and a
 valid weather cache from beside this installation's old executable are imported once, without
 overwriting the chosen destination. Invalid existing preferences still report an error.
-Startup prints `Luma persistent storage:` with the chosen path. Desktop preview retains the legacy
-`$XDG_CONFIG_HOME/luma-native/preferences.json` path, or `~/.config/luma-native/preferences.json`,
+Startup prints `Sera persistent storage:` with the chosen path. Desktop preview retains the legacy
+`$XDG_CONFIG_HOME/sera-native/preferences.json` path, or `~/.config/sera-native/preferences.json`,
 so existing preview choices survive flattening. `--preferences PATH` isolates a manual run.
 Invalid preference files report an error rather than being overwritten. Writes use atomic
 temporary-file renames; use one instance per preferences file. Browser local storage is not
@@ -445,7 +445,7 @@ runtime font/translation services or telemetry are used. Weather attribution: Op
 
 ## Compatibility
 
-Luma's native startup, rendering and app/input discovery have been verified on rooted webOS 26.
+Sera's native startup, rendering and app/input discovery have been verified on rooted webOS 26.
 External testing confirms compatibility with webOS 6 and newer. On webOS 26 use elevated Homebrew Channel
 0.8.0-rc1+ for `lunabus.query`. Root SSH execution does not establish the normal jailed caller
 permissions; check TV-menu startup, launching/reopening and remote/pointer behavior manually.
@@ -455,7 +455,7 @@ versions. Its [library guide](https://www.webosbrew.org/develop/guides/library-v
 internal releases to marketing names: 7/22, 8/23, 9/24, 10/25, 11/26. SDL-webOS's newer
 [`2.30.12-webos.6`](https://github.com/webosbrew/SDL-webOS/releases/tag/release-2.30.12-webos.6)
 reports hotplug verification on webOS 3.4, 4 and 10. That is subsystem evidence for a newer
-prerelease than the pinned `.5` library, not a full Luma compatibility guarantee.
+prerelease than the pinned `.5` library, not a full Sera compatibility guarantee.
 
 ## Checks and CI
 
@@ -487,7 +487,7 @@ Add a changeset to feature/fix PRs that should be included in the next app relea
 pnpm changeset
 ```
 
-Select `lg-luma`, choose patch/minor/major and describe the change. Commit the generated file
+Select `sera`, choose patch/minor/major and describe the change. Commit the generated file
 under `.changeset/` with the PR. Documentation-only and maintenance PRs that do not need a release
 can omit it. Keep the existing app version in ordinary PRs.
 
@@ -505,7 +505,7 @@ installing dependencies or running code from the PR.
 After changesets merge into `main`, `.github/workflows/release-pr.yml` creates or updates the
 **Version Packages** PR on `changeset-release/main`. Changesets combines the pending notes using
 the highest requested bump. The custom `pnpm version:release` command updates `package.json`
-and `CHANGELOG.md`, then synchronizes `appinfo.json`, the root `Cargo.toml`, the `luma` entry in
+and `CHANGELOG.md`, then synchronizes `appinfo.json`, the root `Cargo.toml`, the `sera` entry in
 `Cargo.lock`, and the versioned IPK examples in `readme.md`. Dependency pins and supporting Rust
 crate versions are preserved. The package stays private and is never published to npm.
 

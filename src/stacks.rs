@@ -82,7 +82,7 @@ pub fn row_len(state: &crate::state::State, row: usize) -> usize {
     #[cfg(debug_assertions)]
     if row < 2
         && visible_rows(state).next().is_none()
-        && std::env::var_os("LUMA_STACK_PREVIEW").is_some()
+        && std::env::var_os("SERA_STACK_PREVIEW").is_some()
     {
         return 13;
     }
@@ -111,7 +111,7 @@ pub const SOURCES: [(&str, &str, bool); 3] = [
     ("jellyfin", "Jellyfin", true),
     ("plex", "Plex", true),
 ];
-/// Games stack categories (Moonlight); history is kept by Luma.
+/// Games stack categories (Moonlight); history is kept by Sera.
 pub const GAME_COLLECTIONS: [(&str, &str); 4] = [
     ("recent", "Recently played"),
     ("added", "Recently added"),

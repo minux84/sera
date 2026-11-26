@@ -105,7 +105,7 @@ impl Player {
             .create(true)
             .write(true)
             .truncate(true)
-            .open("/media/developer/com.denisefremov.luma/luma-video.log")
+            .open("/media/developer/it.bytebuilder.sera/sera-video.log")
             .ok();
         let mut command = Command::new("/usr/bin/gst-launch-1.0");
         command.args([

@@ -1,6 +1,6 @@
 /* Experimental LG NDL DirectMedia 2 hardware video wallpaper.
  * ABI-compatible with src/hw_wallpaper.rs; video-only, no RGB readback.
- * Luma photo fallback is kept until the TV reports a decoded frame.
+ * Sera photo fallback is kept until the TV reports a decoded frame.
  */
 #define _GNU_SOURCE
 #define NDL_DIRECTMEDIA_API_VERSION 2
@@ -36,18 +36,18 @@ typedef struct {
     long long video_max_ms;
     unsigned long audio_fed;
     unsigned long audio_backpressure;
-} LumaNDL;
+} SeraNDL;
 // One 20ms stereo CELT fullband silence frame (TOC config 31, stereo).
 static const unsigned char silent_opus_20ms[3]={0xfc,0xff,0xfe};
 // Keep audio at most this far ahead of the newest video PTS.
 #define AUDIO_AHEAD_MS 40
-// NDL calls back on its own threads, also while luma_hw_close() tears the
+// NDL calls back on its own threads, also while sera_hw_close() tears the
 // session down. The player therefore lives in static storage that is never
 // freed (a late callback can never touch freed memory), and `active` is only
 // accessed atomically and cleared before NDL is unloaded.
-static LumaNDL slot;
-static LumaNDL *active=NULL;
-static LumaNDL *current(void){return __atomic_load_n(&active,__ATOMIC_ACQUIRE);}
+static SeraNDL slot;
+static SeraNDL *active=NULL;
+static SeraNDL *current(void){return __atomic_load_n(&active,__ATOMIC_ACQUIRE);}
 static int claimed=0;
 static void release_claim(void){__atomic_store_n(&claimed,0,__ATOMIC_RELEASE);}
 static void record(const char *label,int64_t value);
@@ -78,7 +78,7 @@ static char *json_set_false(const char *json,const char *key) {
     return out;
 }
 static void log_load(const char *label,const char *json) {
-    FILE *f=fopen("/media/developer/com.denisefremov.luma/luma-ndl-load.log",
+    FILE *f=fopen("/media/developer/it.bytebuilder.sera/sera-ndl-load.log",
                   strcmp(label,"ORIGINAL")?"a":"w");
     if(f){fprintf(f,"%s %s\n",label,json);fclose(f);}
 }
@@ -93,7 +93,7 @@ long _ZN17StarfishMediaAPIs4LoadEPKcPFvixS1_E(void *self,const char *json,
         if(!real)real=(StarfishLoad)dlsym(RTLD_NEXT,STARFISH_LOAD);
         if(!real){record("LOAD_HOOK_MISSING",-1);return 0;}
     }
-    if(!json || !strstr(json,"DIRECTMEDIA") || getenv("LUMA_NDL_LOW_DELAY"))
+    if(!json || !strstr(json,"DIRECTMEDIA") || getenv("SERA_NDL_LOW_DELAY"))
         return real(self,json,cb);
     log_load("ORIGINAL",json);
     char *a=json_set_false(json,"lowDelayMode");
@@ -105,16 +105,16 @@ long _ZN17StarfishMediaAPIs4LoadEPKcPFvixS1_E(void *self,const char *json,
     free(a);free(b);
     return rc;
 }
-/* Luma dlopens this library RTLD_LOCAL. Promote it to the global scope so the
+/* Sera dlopens this library RTLD_LOCAL. Promote it to the global scope so the
  * definition above wins when NDL later dlopens its implementation library. */
 __attribute__((constructor)) static void promote_global(void) {
     Dl_info info;
     if(dladdr((void *)promote_global,&info) && info.dli_fname)
         dlopen(info.dli_fname,RTLD_NOW|RTLD_NOLOAD|RTLD_GLOBAL);
 }
-#define LOG_DIR "/media/developer/com.denisefremov.luma/"
-#define EVENTS_LOG LOG_DIR "luma-ndl-events.log"
-#define EVENTS_LOG_PREV LOG_DIR "luma-ndl-events.prev.log"
+#define LOG_DIR "/media/developer/it.bytebuilder.sera/"
+#define EVENTS_LOG LOG_DIR "sera-ndl-events.log"
+#define EVENTS_LOG_PREV LOG_DIR "sera-ndl-events.prev.log"
 static void record(const char *label,int64_t value) {
     // Same cap as src/logs.rs: past 1 MiB keep one backup, start afresh.
     struct stat st;
@@ -124,11 +124,11 @@ static void record(const char *label,int64_t value) {
 }
 static void resource_released(const char *reason) {
     record("RESOURCE_RELEASED",0);
-    LumaNDL *p=current();
+    SeraNDL *p=current();
     if(p)__atomic_store_n(&p->errored,1,__ATOMIC_RELEASE);
 }
 static void callback(int type,long long value,const char *str) {
-    LumaNDL *p=current();
+    SeraNDL *p=current();
     if(type==0) {
         if(p){
             int64_t n=__atomic_add_fetch(&p->frames,1,__ATOMIC_SEQ_CST);
@@ -148,11 +148,11 @@ static void callback(int type,long long value,const char *str) {
         }
     }
 }
-void *luma_hw_open(const char *app_id,int width,int height,const char *codec) {
+void *sera_hw_open(const char *app_id,int width,int height,const char *codec) {
     if(!app_id||width<=0||height<=0)return NULL;
     // Claim the single NDL session; a second open while one is live fails.
     if(__atomic_exchange_n(&claimed,1,__ATOMIC_ACQ_REL))return NULL;
-    LumaNDL *p=&slot;
+    SeraNDL *p=&slot;
     memset(p,0,sizeof(*p));
     __atomic_store_n(&active,p,__ATOMIC_RELEASE);
     p->queue_min=INT_MAX;
@@ -196,8 +196,8 @@ fail:
     if(p->initialized)NDL_DirectMediaQuit();
     release_claim();return NULL;
 }
-int luma_hw_feed(void *opaque,const void *buffer,size_t size,int64_t pts_ns) {
-    LumaNDL *p=opaque;
+int sera_hw_feed(void *opaque,const void *buffer,size_t size,int64_t pts_ns) {
+    SeraNDL *p=opaque;
     if(!p || !p->loaded || __atomic_load_n(&p->errored,__ATOMIC_ACQUIRE) || !buffer || !size)return -1;
     int result=NDL_DirectVideoPlay((void*)buffer,(unsigned int)size,pts_ns/1000000);
     if(result==0){
@@ -244,15 +244,15 @@ int luma_hw_feed(void *opaque,const void *buffer,size_t size,int64_t pts_ns) {
 }
 // One compact line per second, capped to 1 MiB with a single backup.
 // Called only from the reader thread; callbacks use atomic counters.
-void luma_hw_metrics(void *opaque,int index,const char *source,const char *codec,
+void sera_hw_metrics(void *opaque,int index,const char *source,const char *codec,
                      unsigned au,unsigned retries,unsigned errors,double avg_late_ms,
                      double max_late_ms,size_t max_au) {
-    LumaNDL *p=opaque;
+    SeraNDL *p=opaque;
     if(!p)return;
-    const char *path="/media/developer/com.denisefremov.luma/luma-video-metrics.log";
+    const char *path="/media/developer/it.bytebuilder.sera/sera-video-metrics.log";
     struct stat st;
     if(stat(path,&st)==0 && st.st_size>1024*1024){
-        rename(path,"/media/developer/com.denisefremov.luma/luma-video-metrics.prev.log");
+        rename(path,"/media/developer/it.bytebuilder.sera/sera-video-metrics.prev.log");
     }
     FILE *f=fopen(path,"a");
     if(!f)return;
@@ -282,15 +282,15 @@ void luma_hw_metrics(void *opaque,int index,const char *source,const char *codec
     p->queue_min=INT_MAX;
     p->queue_max=0;
 }
-int luma_hw_set_drop_threshold(void *opaque,int threshold) {
-    LumaNDL *p=opaque;
+int sera_hw_set_drop_threshold(void *opaque,int threshold) {
+    SeraNDL *p=opaque;
     if(!p || !p->loaded)return -1;
     int rc=NDL_DirectVideoSetFrameDropThreshold(threshold);
     record("DROP_THRESHOLD",rc);
     return rc;
 }
-int64_t luma_hw_frames_rendered(void *opaque) {
-    LumaNDL *p=opaque;
+int64_t sera_hw_frames_rendered(void *opaque) {
+    SeraNDL *p=opaque;
     if(!p)return 0;
     int64_t confirmed=__atomic_load_n(&p->frames,__ATOMIC_SEQ_CST);
     if(confirmed>0)return confirmed;
@@ -305,12 +305,12 @@ int64_t luma_hw_frames_rendered(void *opaque) {
         return (int64_t)p->fed;
     return 0;
 }
-int luma_hw_ended(void *opaque) {
-    LumaNDL *p=opaque;
+int sera_hw_ended(void *opaque) {
+    SeraNDL *p=opaque;
     return !p || __atomic_load_n(&p->errored,__ATOMIC_ACQUIRE);
 }
-void luma_hw_close(void *opaque) {
-    LumaNDL *p=opaque;
+void sera_hw_close(void *opaque) {
+    SeraNDL *p=opaque;
     if(!p)return;
     record("CLOSE",p->fed);
     // Detach first: callbacks that fire during teardown then see no player

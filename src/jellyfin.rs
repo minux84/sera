@@ -1,4 +1,4 @@
-//! Jellyfin for Home stacks. Luma signs in with Quick Connect: the TV shows a
+//! Jellyfin for Home stacks. Sera signs in with Quick Connect: the TV shows a
 //! code, the user approves it on the phone. Nothing is typed with the remote
 //! and no password is ever seen. The access token is never logged.
 use crate::media::{Detail, Episode, PlayRequest};
@@ -21,7 +21,7 @@ pub struct JellyfinLink {
     pub user_id: String,
     pub user_name: String,
     pub token: String,
-    /// Random per-install id; Jellyfin lists Luma as its own device.
+    /// Random per-install id; Jellyfin lists Sera as its own device.
     pub device_id: String,
 }
 
@@ -177,7 +177,7 @@ fn agent() -> ureq::Agent {
 
 fn auth(device_id: &str, token: &str) -> String {
     let mut header = format!(
-        "MediaBrowser Client=\"Luma\", Device=\"LG TV\", DeviceId=\"{device_id}\", Version=\"{}\"",
+        "MediaBrowser Client=\"Sera\", Device=\"LG TV\", DeviceId=\"{device_id}\", Version=\"{}\"",
         env!("CARGO_PKG_VERSION")
     );
     if !token.is_empty() {
@@ -1297,12 +1297,12 @@ mod tests {
         assert!(!list.is_empty());
     }
 
-    /// Real server: LUMA_JF_LINK=<file with the saved "jellyfin" JSON>
+    /// Real server: SERA_JF_LINK=<file with the saved "jellyfin" JSON>
     /// `cargo test _live -- --ignored --nocapture`. Prints no token.
     #[test]
     #[ignore]
     fn library_live() {
-        let path = std::env::var("LUMA_JF_LINK").expect("LUMA_JF_LINK");
+        let path = std::env::var("SERA_JF_LINK").expect("SERA_JF_LINK");
         let link: JellyfinLink =
             serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
         let mut lists = vec![
@@ -1332,7 +1332,7 @@ mod tests {
     #[test]
     #[ignore]
     fn album_live() {
-        let path = std::env::var("LUMA_JF_LINK").expect("LUMA_JF_LINK");
+        let path = std::env::var("SERA_JF_LINK").expect("SERA_JF_LINK");
         let link: JellyfinLink =
             serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
         let agent = agent();
@@ -1341,7 +1341,7 @@ mod tests {
         let (guid, title) = card_target(&cards[0]);
         let id = card_id(&guid);
         assert!(is_album(id));
-        let cache = std::env::temp_dir().join("luma-album-live");
+        let cache = std::env::temp_dir().join("sera-album-live");
         std::fs::create_dir_all(&cache).unwrap();
         let (tx, rx) = mpsc::channel();
         album(&tx, &cache, &link, id);
@@ -1438,7 +1438,7 @@ mod tests {
     fn jellyfin_demo() {
         let server = "https://demo.jellyfin.org/stable".to_owned();
         let (reply, responses) = mpsc::channel();
-        let device = "luma-test-device".to_owned();
+        let device = "sera-test-device".to_owned();
         let worker = {
             let (reply, server, device) = (reply.clone(), server.clone(), device.clone());
             thread::spawn(move || connect(&reply, server, device, ATTEMPT.load(Ordering::SeqCst)))
@@ -1450,13 +1450,13 @@ mod tests {
         let agent = agent();
         let demo = agent
             .post(&format!("{server}/Users/AuthenticateByName"))
-            .header("Authorization", &auth("luma-test-phone", ""))
+            .header("Authorization", &auth("sera-test-phone", ""))
             .header("Content-Type", "application/json")
             .send(r#"{"Username":"demo","Pw":""}"#)
             .ok()
             .and_then(read)
             .expect("demo login");
-        let phone = auth("luma-test-phone", &text(&demo, "AccessToken"));
+        let phone = auth("sera-test-phone", &text(&demo, "AccessToken"));
         let approved = agent
             .post(&format!("{server}/QuickConnect/Authorize?code={code}"))
             .header("Authorization", &phone)
@@ -1470,7 +1470,7 @@ mod tests {
         worker.join().unwrap();
         assert!(link.linked() && !link.user_id.is_empty());
 
-        let cache = std::env::temp_dir().join("luma-jellyfin-test");
+        let cache = std::env::temp_dir().join("sera-jellyfin-test");
         let _ = std::fs::create_dir_all(&cache);
         fetch(
             &reply,

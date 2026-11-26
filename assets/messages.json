@@ -32,12 +32,12 @@
     "it": "Impostazioni"
   },
   "settingsRegion": {
-    "en": "Luma settings",
-    "de": "Luma-Einstellungen",
-    "es": "Ajustes de Luma",
-    "zh": "Luma 设置",
-    "pt": "Ajustes do Luma",
-    "it": "Impostazioni di Luma"
+    "en": "Sera settings",
+    "de": "Sera-Einstellungen",
+    "es": "Ajustes de Sera",
+    "zh": "Sera 设置",
+    "pt": "Ajustes do Sera",
+    "it": "Impostazioni di Sera"
   },
   "mainNavigation": {
     "en": "Main navigation",
@@ -1416,11 +1416,11 @@
     "it": "Scheda di prova per lo scorrimento; nessuna app da avviare."
   },
   "appsRetryHint": {
-    "en": "Luma will try again on its own.",
-    "de": "Luma versucht es gleich selbst noch einmal.",
-    "es": "Luma lo volverá a intentar sola.",
-    "zh": "Luma 会自动重试。",
-    "pt": "A Luma vai tentar de novo sozinha.",
-    "it": "Luma riproverà da sola."
+    "en": "Sera will try again on its own.",
+    "de": "Sera versucht es gleich selbst noch einmal.",
+    "es": "Sera lo volverá a intentar sola.",
+    "zh": "Sera 会自动重试。",
+    "pt": "A Sera vai tentar de novo sozinha.",
+    "it": "Sera riproverà da sola."
   }
 }

@@ -13,7 +13,7 @@ UC=list(range(0x20,0x250))+list(range(0x400,0x530))+list(range(0x1C80,0x1C90))+l
 REQUIRED='КинопоискДенисПривет'
 NAMES={'archivo':'Archivo Expanded','inter':'Inter','unbounded':'Unbounded','montserrat':'Montserrat','manrope':'Manrope','onest':'Onest','rubik':'Rubik','exo2':'Exo 2','raleway':'Raleway','oswald':'Oswald','russoone':'Russo One','jost':'Jost','playfairdisplay':'Playfair Display','prata':'Prata','fraunces':'Fraunces','spacegrotesk':'Space Grotesk','syne':'Syne','bebasneue':'Bebas Neue','golostext':'Golos Text','ibmplexsans':'IBM Plex Sans','notosans':'Noto Sans','sourcesans3':'Source Sans 3','roboto':'Roboto','ptsans':'PT Sans','opensans':'Open Sans','nunitosans':'Nunito Sans','nunito':'Nunito'}
 def req(url):
- return urllib.request.urlopen(urllib.request.Request(url,headers={'User-Agent':'Luma-OpenFont-LicenseAudit'}),timeout=45).read()
+ return urllib.request.urlopen(urllib.request.Request(url,headers={'User-Agent':'Sera-OpenFont-LicenseAudit'}),timeout=45).read()
 if len(sys.argv)>1 and sys.argv[1]=='fetch':
  for fam in FAMILIES:
   if (SOURCE/f'{fam}-catalog.ttf').is_file() and (SOURCE/f'{fam}-catalog-OFL.txt').is_file(): continue

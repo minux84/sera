@@ -1,14 +1,14 @@
-//! Root helper started by Luma (`luma --pad-watch`). A gamepad plugged into
-//! the TV goes straight to Moonlight, so Luma cannot see its buttons. This
+//! Root helper started by Sera (`sera --pad-watch`). A gamepad plugged into
+//! the TV goes straight to Moonlight, so Sera cannot see its buttons. This
 //! process reads them from evdev, and a double Start+Select while Moonlight
-//! streams leaves a flag and brings Luma back, which closes the game.
+//! streams leaves a flag and brings Sera back, which closes the game.
 use std::collections::HashSet;
 use std::io::Read;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
-pub const FLAG: &str = "/media/developer/com.denisefremov.luma/moonlight-quit";
-pub const PIDFILE: &str = "/tmp/luma-pad-watch.pid";
+pub const FLAG: &str = "/media/developer/it.bytebuilder.sera/moonlight-quit";
+pub const PIDFILE: &str = "/tmp/sera-pad-watch.pid";
 const MOONLIGHT: &str = "com.limelight.webos";
 const BTN_SELECT: u16 = 0x13a;
 const BTN_START: u16 = 0x13b;
@@ -91,7 +91,7 @@ fn moonlight_in_front() -> bool {
 
 pub fn run() -> ! {
     let _ = std::fs::write(PIDFILE, std::process::id().to_string());
-    eprintln!("Luma pad watch started");
+    eprintln!("Sera pad watch started");
     let (sender, receiver) = mpsc::channel();
     let mut watched: HashSet<String> = HashSet::new();
     let mut chord = Chord::default();
@@ -115,11 +115,11 @@ pub fn run() -> ! {
         match receiver.recv_timeout(Duration::from_secs(1)) {
             Ok((code, down)) => {
                 if chord.key(code, down, Instant::now()) && moonlight_in_front() {
-                    eprintln!("Luma pad watch: Start+Select twice, closing the game");
+                    eprintln!("Sera pad watch: Start+Select twice, closing the game");
                     let _ = std::fs::write(FLAG, b"1");
                     luna(
                         "luna://com.webos.service.applicationManager/launch",
-                        "{\"id\":\"com.denisefremov.luma\"}",
+                        "{\"id\":\"it.bytebuilder.sera\"}",
                     );
                 }
             }

@@ -93,7 +93,7 @@ impl Options {
         let mut result = Self::default();
         let mut args = std::env::args().skip(1).peekable();
         // SAM/jailer puts native launch metadata (e.g. @system_native_app and
-        // nid) in argv[1]. It is not a Luma CLI option. Keep the original argv
+        // nid) in argv[1]. It is not a Sera CLI option. Keep the original argv
         // intact for SDL/libhelpers, which also read the process launch data.
         if cfg!(feature = "webos")
             && args.peek().is_some_and(|argument| {
@@ -107,12 +107,12 @@ impl Options {
                 result.webos_home = metadata.get("nid").and_then(serde_json::Value::as_str)
                     == Some(platform::HOME_ID);
             }
-            eprintln!("Luma webOS launch parameters accepted");
+            eprintln!("Sera webOS launch parameters accepted");
         }
         while let Some(arg) = args.next() {
             if arg == "--help" {
                 println!(
-                    "Luma native\n\n  --assets PATH       Generated artwork directory\n  --preferences PATH  Isolated preferences file\n  --fullscreen        Fullscreen desktop preview\n  --resolution SIZE   Request 1080p, 4k, or WIDTHxHEIGHT; verify actual drawable\n  --frames N          Exit after N event-loop frames\n  --profile-frames N  Force N presentations (20+) and report pacing after warmup\n  --script ACTIONS    Comma-separated home/apps/settings/up/down/left/right/enter/back/menu/hold/type:TEXT/click:X:Y/wait\n  --time RFC3339      Fix the preview's clock and date\n  --screenshot PATH   Save an offscreen PNG\n  --capture-scale N   Capture at 1x/1080p (default) or 2x/4k\n  --diagnostics PATH  Save actual drawable, GPU, font-cache and timing information\n  --dump-state PATH   Save final UI state as JSON\n\nCompile with --features webos for the TV backend. Desktop builds never call TV services."
+                    "Sera native\n\n  --assets PATH       Generated artwork directory\n  --preferences PATH  Isolated preferences file\n  --fullscreen        Fullscreen desktop preview\n  --resolution SIZE   Request 1080p, 4k, or WIDTHxHEIGHT; verify actual drawable\n  --frames N          Exit after N event-loop frames\n  --profile-frames N  Force N presentations (20+) and report pacing after warmup\n  --script ACTIONS    Comma-separated home/apps/settings/up/down/left/right/enter/back/menu/hold/type:TEXT/click:X:Y/wait\n  --time RFC3339      Fix the preview's clock and date\n  --screenshot PATH   Save an offscreen PNG\n  --capture-scale N   Capture at 1x/1080p (default) or 2x/4k\n  --diagnostics PATH  Save actual drawable, GPU, font-cache and timing information\n  --dump-state PATH   Save final UI state as JSON\n\nCompile with --features webos for the TV backend. Desktop builds never call TV services."
                 );
                 println!(
                     "\n  --test-extra-apps N  Explicit scroll preview with up to 300 non-launchable extra cards; separate preferences"
@@ -379,7 +379,7 @@ fn effects(
                         ));
                     }
                 } else {
-                    state.notify("Connect Luma to Sunshine first");
+                    state.notify("Connect Sera to Sunshine first");
                 }
             }
             Effect::StacksRefresh => stacks_refresh(state),
@@ -492,7 +492,7 @@ fn effects(
                 ));
             }
             Effect::MediaThumbs(id, list) => media::thumbs_request(id, list),
-            // Trailers play in Luma's own player too, never the TV's.
+            // Trailers play in Sera's own player too, never the TV's.
             Effect::PlayUrl(url, title) => {
                 let request = player::OpenRequest {
                     url,
@@ -766,7 +766,7 @@ fn main() {
         pad_watch::run();
     }
     if let Err(error) = run() {
-        eprintln!("Luma native: {error}");
+        eprintln!("Sera native: {error}");
         std::process::exit(1);
     }
 }
@@ -863,10 +863,10 @@ fn compose(
 fn jellyfin_service() -> &'static jellyfin::Service {
     static SERVICE: std::sync::OnceLock<jellyfin::Service> = std::sync::OnceLock::new();
     SERVICE.get_or_init(|| {
-        let cache = if std::path::Path::new("/media/developer/com.denisefremov.luma").exists() {
-            std::path::PathBuf::from("/media/developer/com.denisefremov.luma/posters")
+        let cache = if std::path::Path::new("/media/developer/it.bytebuilder.sera").exists() {
+            std::path::PathBuf::from("/media/developer/it.bytebuilder.sera/posters")
         } else {
-            std::env::temp_dir().join("luma-posters")
+            std::env::temp_dir().join("sera-posters")
         };
         jellyfin::Service::new(cache)
     })
@@ -904,7 +904,7 @@ fn jellyfin_form_start() {
         }],
         submit_label: "Connect".into(),
         success_title: "Server found".into(),
-        success_message: "Look at your TV: Luma shows a Quick Connect code.".into(),
+        success_message: "Look at your TV: Sera shows a Quick Connect code.".into(),
         route: "/jellyfin".into(),
     };
     let (server_tx, servers) = std::sync::mpsc::channel();
@@ -1094,10 +1094,10 @@ fn jellyfin_tick(state: &mut State, preferences_path: &std::path::Path, platform
 fn plex_service() -> &'static plex::Service {
     static SERVICE: std::sync::OnceLock<plex::Service> = std::sync::OnceLock::new();
     SERVICE.get_or_init(|| {
-        let cache = if std::path::Path::new("/media/developer/com.denisefremov.luma").exists() {
-            std::path::PathBuf::from("/media/developer/com.denisefremov.luma/posters")
+        let cache = if std::path::Path::new("/media/developer/it.bytebuilder.sera").exists() {
+            std::path::PathBuf::from("/media/developer/it.bytebuilder.sera/posters")
         } else {
-            std::env::temp_dir().join("luma-posters")
+            std::env::temp_dir().join("sera-posters")
         };
         plex::Service::new(cache)
     })
@@ -1191,10 +1191,10 @@ fn jellyfin_device_id(state: &mut State) -> String {
 fn steam_service() -> &'static steam::Service {
     static SERVICE: std::sync::OnceLock<steam::Service> = std::sync::OnceLock::new();
     SERVICE.get_or_init(|| {
-        let cache = if std::path::Path::new("/media/developer/com.denisefremov.luma").exists() {
-            std::path::PathBuf::from("/media/developer/com.denisefremov.luma/moonlight-cache")
+        let cache = if std::path::Path::new("/media/developer/it.bytebuilder.sera").exists() {
+            std::path::PathBuf::from("/media/developer/it.bytebuilder.sera/moonlight-cache")
         } else {
-            std::env::temp_dir().join("luma-moonlight-cache")
+            std::env::temp_dir().join("sera-moonlight-cache")
         };
         steam::Service::new(cache)
     })
@@ -1202,10 +1202,10 @@ fn steam_service() -> &'static steam::Service {
 fn moonlight_service() -> &'static moonlight::Service {
     static SERVICE: std::sync::OnceLock<moonlight::Service> = std::sync::OnceLock::new();
     SERVICE.get_or_init(|| {
-        let cache = if std::path::Path::new("/media/developer/com.denisefremov.luma").exists() {
-            std::path::PathBuf::from("/media/developer/com.denisefremov.luma/moonlight-cache")
+        let cache = if std::path::Path::new("/media/developer/it.bytebuilder.sera").exists() {
+            std::path::PathBuf::from("/media/developer/it.bytebuilder.sera/moonlight-cache")
         } else {
-            std::env::temp_dir().join("luma-moonlight-cache")
+            std::env::temp_dir().join("sera-moonlight-cache")
         };
         moonlight::Service::new(cache)
     })
@@ -1472,7 +1472,7 @@ fn open_player(state: &mut State, platform: &Platform, request: player::OpenRequ
     state.dirty = true;
 }
 
-/// Launch parameters for com.denisefremov.luma.player. Holds signed URLs and the token;
+/// Launch parameters for it.bytebuilder.sera.player. Holds signed URLs and the token;
 /// never logged.
 fn web_player_params(state: &State, request: &player::OpenRequest) -> serde_json::Value {
     let (a, b) = state.accent_colors();
@@ -1793,7 +1793,7 @@ fn run() -> Result<(), String> {
     let startup_stage = |stage: &str| {
         if webos {
             eprintln!(
-                "Luma startup: {stage} after {} ms",
+                "Sera startup: {stage} after {} ms",
                 startup.elapsed().as_millis()
             );
         }
@@ -1817,7 +1817,7 @@ fn run() -> Result<(), String> {
             std::env::set_var("APPID", surface_id);
             std::env::set_var("SDL_VIDEO_WAYLAND_WMCLASS", surface_id);
         }
-        eprintln!("Luma webOS surface: {surface_id}");
+        eprintln!("Sera webOS surface: {surface_id}");
         sdl2::hint::set("SDL_WEBOS_ACCESS_POLICY_KEYS_BACK", "true");
     }
     // Resolve the local offset before artwork, HTTP or platform workers start.
@@ -1859,9 +1859,9 @@ fn run() -> Result<(), String> {
     let _ = moonlight_service();
     // Desktop game-card mockup and game Home row, using synthetic preview entries.
     #[cfg(debug_assertions)]
-    if std::env::var_os("LUMA_GAME_PREVIEW").is_some() {
+    if std::env::var_os("SERA_GAME_PREVIEW").is_some() {
         let item = stacks::StackItem {
-            title: std::env::var("LUMA_GAME_PREVIEW")
+            title: std::env::var("SERA_GAME_PREVIEW")
                 .ok()
                 .filter(|t| t.len() > 1)
                 .unwrap_or_else(|| "Cyberpunk 2077".into()),
@@ -1878,7 +1878,7 @@ fn run() -> Result<(), String> {
         ));
         state.focus = Target::GamePlay;
         // Desktop QA of the entrance: Steam answered, frozen this many seconds in.
-        if let Some(at) = std::env::var("LUMA_GAME_PREVIEW_AT")
+        if let Some(at) = std::env::var("SERA_GAME_PREVIEW_AT")
             .ok()
             .and_then(|v| v.parse::<f32>().ok())
         {
@@ -1899,7 +1899,7 @@ fn run() -> Result<(), String> {
         }
     }
     #[cfg(debug_assertions)]
-    if std::env::var_os("LUMA_STACK_PREVIEW").is_some() && state.preferences.stacks.is_empty() {
+    if std::env::var_os("SERA_STACK_PREVIEW").is_some() && state.preferences.stacks.is_empty() {
         state.preferences.stacks.push(stacks::StackConfig {
             name: "Games".into(),
             source: "moonlight".into(),
@@ -1923,9 +1923,9 @@ fn run() -> Result<(), String> {
             },
         ]);
     }
-    // Desktop QA of the Plex sign-in: LUMA_PLEX_PREVIEW=code|error.
+    // Desktop QA of the Plex sign-in: SERA_PLEX_PREVIEW=code|error.
     #[cfg(debug_assertions)]
-    if let Ok(stage) = std::env::var("LUMA_PLEX_PREVIEW") {
+    if let Ok(stage) = std::env::var("SERA_PLEX_PREVIEW") {
         state.page = state::Page::Settings;
         state.section = state::STACKS_SECTION;
         state.settings_level = state::SettingsLevel::PlexLink;
@@ -1940,9 +1940,9 @@ fn run() -> Result<(), String> {
             state.plex_status = Some("Waiting for sign-in…".into());
         }
     }
-    // Desktop QA of the Home mini-player: LUMA_MINI_PREVIEW=<cover path>[:focused button 0-5].
+    // Desktop QA of the Home mini-player: SERA_MINI_PREVIEW=<cover path>[:focused button 0-5].
     #[cfg(debug_assertions)]
-    if let Ok(spec) = std::env::var("LUMA_MINI_PREVIEW") {
+    if let Ok(spec) = std::env::var("SERA_MINI_PREVIEW") {
         let mut parts = spec.split(':');
         let cover = parts.next().filter(|p| !p.is_empty()).map(str::to_owned);
         let focus = parts.next().and_then(|v| v.parse::<usize>().ok());
@@ -1979,9 +1979,9 @@ fn run() -> Result<(), String> {
             state.pointer = false;
         }
     }
-    // Desktop QA of the album card: LUMA_ALBUM_PREVIEW=<cover image path>[:focused song].
+    // Desktop QA of the album card: SERA_ALBUM_PREVIEW=<cover image path>[:focused song].
     #[cfg(debug_assertions)]
-    if let Ok(spec) = std::env::var("LUMA_ALBUM_PREVIEW") {
+    if let Ok(spec) = std::env::var("SERA_ALBUM_PREVIEW") {
         let (cover, focus) = spec.rsplit_once(':').unwrap_or((spec.as_str(), ""));
         let item = stacks::StackItem {
             id: 7,
@@ -2009,10 +2009,10 @@ fn run() -> Result<(), String> {
             cover: Some(cover.to_owned()),
             backdrop: None,
         };
-        if std::env::var("LUMA_ALBUM_NOBG").is_err() {
+        if std::env::var("SERA_ALBUM_NOBG").is_err() {
             album.backdrop = media::poster_backdrop(
                 std::path::Path::new("/tmp"),
-                "luma-album-preview-pb",
+                "sera-album-preview-pb",
                 cover,
             );
         }
@@ -2024,9 +2024,9 @@ fn run() -> Result<(), String> {
             }
         }
     }
-    // Desktop QA of the Jellyfin sign-in: LUMA_JELLYFIN_PREVIEW=code|search|error|phone.
+    // Desktop QA of the Jellyfin sign-in: SERA_JELLYFIN_PREVIEW=code|search|error|phone.
     #[cfg(debug_assertions)]
-    if let Ok(stage) = std::env::var("LUMA_JELLYFIN_PREVIEW") {
+    if let Ok(stage) = std::env::var("SERA_JELLYFIN_PREVIEW") {
         state.page = state::Page::Settings;
         state.section = state::STACKS_SECTION;
         state.settings_level = state::SettingsLevel::JellyfinLink;
@@ -2066,7 +2066,7 @@ fn run() -> Result<(), String> {
         }
     }
     #[cfg(debug_assertions)]
-    if let Ok(stage) = std::env::var("LUMA_MOONLIGHT_PREVIEW") {
+    if let Ok(stage) = std::env::var("SERA_MOONLIGHT_PREVIEW") {
         state.page = state::Page::Settings;
         state.section = state::STACKS_SECTION;
         let host = moonlight::Host {
@@ -2106,9 +2106,9 @@ fn run() -> Result<(), String> {
             state.focus = Target::MoonlightHost(0);
         }
     }
-    // Desktop QA of the Library page: LUMA_LIBRARY_PREVIEW=movies|games|albums[:focused card[:scroll]].
+    // Desktop QA of the Library page: SERA_LIBRARY_PREVIEW=movies|games|albums[:focused card[:scroll]].
     #[cfg(debug_assertions)]
-    if let Ok(spec) = std::env::var("LUMA_LIBRARY_PREVIEW") {
+    if let Ok(spec) = std::env::var("SERA_LIBRARY_PREVIEW") {
         let mut parts = spec.split(':');
         let kind = parts.next().unwrap_or_default();
         let games = kind == "games";
@@ -2174,7 +2174,7 @@ fn run() -> Result<(), String> {
             library.scroll_goal = library.scroll_goal.max(scroll);
             library.scroll = library.scroll_goal;
         }
-        state.focus = match std::env::var("LUMA_LIBRARY_FOCUS").as_deref() {
+        state.focus = match std::env::var("SERA_LIBRARY_FOCUS").as_deref() {
             Ok("back") => Target::LibBack,
             Ok("search") => Target::LibSearch,
             Ok(tab) if tab.starts_with("tab") => Target::LibTab(tab[3..].parse().unwrap_or(0)),
@@ -2183,7 +2183,7 @@ fn run() -> Result<(), String> {
         state.dirty = true;
     }
     #[cfg(debug_assertions)]
-    if std::env::var("LUMA_STACKS_PREVIEW").is_ok() {
+    if std::env::var("SERA_STACKS_PREVIEW").is_ok() {
         let images = [
             "forest.jpg",
             "dunes.jpg",
@@ -2212,14 +2212,14 @@ fn run() -> Result<(), String> {
             .collect();
         state.dirty = true;
     }
-    // Desktop design QA of the title card: LUMA_MOVIE_PREVIEW=movie|series[:panel].
+    // Desktop design QA of the title card: SERA_MOVIE_PREVIEW=movie|series[:panel].
     #[cfg(debug_assertions)]
-    if let Ok(kind) = std::env::var("LUMA_MOVIE_PREVIEW") {
+    if let Ok(kind) = std::env::var("SERA_MOVIE_PREVIEW") {
         state.movie_preview(&kind, &assets.root);
     }
     // Shuffle means a new order on every start, beginning with a random clip;
     // the saved seed alone replayed the same sequence each time.
-    if !webos && let Ok(kind) = std::env::var("LUMA_PLAYER_PREVIEW") {
+    if !webos && let Ok(kind) = std::env::var("SERA_PLAYER_PREVIEW") {
         let source = match kind.as_str() {
             "series" => player::Source::Series,
             "youtube" => player::Source::Youtube,
@@ -2227,16 +2227,16 @@ fn run() -> Result<(), String> {
             _ => player::Source::Movie,
         };
         let mut session = player::Session::new(player::OpenRequest::preview(source));
-        session.ready = std::env::var_os("LUMA_PLAYER_LOADING").is_none();
+        session.ready = std::env::var_os("SERA_PLAYER_LOADING").is_none();
         session.paused = true;
         session.buffered_ms = session.position_ms + 600_000;
         state.playback = Some(session);
         state.focus = state::Target::PlayerToggle;
     }
     // TV diagnosis without the remote: a URL dropped into this file opens
-    // the Luma player once at start (the file is consumed).
+    // the Sera player once at start (the file is consumed).
     if webos {
-        let path = "/media/developer/com.denisefremov.luma/cinema-test-url";
+        let path = "/media/developer/it.bytebuilder.sera/cinema-test-url";
         if let Ok(url) = std::fs::read_to_string(path) {
             let _ = std::fs::remove_file(path);
             let mut request = player::OpenRequest::preview(player::Source::Movie);
@@ -2279,7 +2279,7 @@ fn run() -> Result<(), String> {
     }
     if options.test_extra_apps > 0 {
         eprintln!(
-            "Luma scroll preview: explicit {}-app expansion; preferences {}",
+            "Sera scroll preview: explicit {}-app expansion; preferences {}",
             options.test_extra_apps,
             preferences_path.display()
         );
@@ -2331,7 +2331,7 @@ fn run() -> Result<(), String> {
             std::env::var_os("WAYLAND_DISPLAY"),
         )
     })?;
-    eprintln!("Luma SDL video driver: {}", video.current_video_driver());
+    eprintln!("Sera SDL video driver: {}", video.current_video_driver());
     startup_stage("SDL video");
     let attributes = video.gl_attr();
     if webos {
@@ -2351,7 +2351,7 @@ fn run() -> Result<(), String> {
         Size::new(1280, 720)
     });
     let create_window = || {
-        let mut builder = video.window("Luma", requested.width, requested.height);
+        let mut builder = video.window("Sera", requested.width, requested.height);
         builder.opengl().allow_highdpi().position_centered();
         if options.fullscreen || (webos && options.resolution.is_none() && !requested.is_4k()) {
             builder.fullscreen_desktop();
@@ -2397,10 +2397,10 @@ fn run() -> Result<(), String> {
         gl::GetIntegerv(gl::SAMPLES, &mut samples);
         gl::GetIntegerv(0x0D55, &mut alpha_bits);
     }
-    eprintln!("Luma GL: {samples} samples, {alpha_bits} alpha bits");
+    eprintln!("Sera GL: {samples} samples, {alpha_bits} alpha bits");
     if webos {
         let _ = std::fs::write(
-            "/media/developer/com.denisefremov.luma/luma-egl.txt",
+            "/media/developer/it.bytebuilder.sera/sera-egl.txt",
             format!(
                 "window={}x{} samples={} alpha_bits={}\n",
                 requested.width, requested.height, samples, alpha_bits
@@ -2431,8 +2431,8 @@ fn run() -> Result<(), String> {
     let mut observed_resolutions: Vec<(Size, f64)> = Vec::new();
     let mut profile = diagnostics::Profile::default();
     let mut presented = 0usize;
-    // LUMA_PROF_SLOW=<ms>: log every presented frame slower than that.
-    let prof_slow: Option<f64> = std::env::var("LUMA_PROF_SLOW")
+    // SERA_PROF_SLOW=<ms>: log every presented frame slower than that.
+    let prof_slow: Option<f64> = std::env::var("SERA_PROF_SLOW")
         .ok()
         .and_then(|v| v.parse().ok());
     let mut slow_at: Option<Instant> = None;
@@ -2585,7 +2585,7 @@ fn run() -> Result<(), String> {
             if let Ok(mut f) = std::fs::OpenOptions::new()
                 .create(true)
                 .append(true)
-                .open("/media/developer/com.denisefremov.luma/luma-video-state.txt")
+                .open("/media/developer/it.bytebuilder.sera/sera-video-state.txt")
             {
                 let _ = f.write_all(line.as_bytes());
             }
@@ -2669,8 +2669,8 @@ fn run() -> Result<(), String> {
                 // Each new video frame is a legitimate repaint, not an animation timer.
                 state.dirty = true;
                 if player.frame_count() <= 3 || player.frame_count() % 300 == 0 {
-                    eprintln!("Luma video GPU frame #{} uploaded", player.frame_count());
-                    let path = "/media/developer/com.denisefremov.luma/luma-gpu-frames.txt";
+                    eprintln!("Sera video GPU frame #{} uploaded", player.frame_count());
+                    let path = "/media/developer/it.bytebuilder.sera/sera-gpu-frames.txt";
                     use std::io::Write;
                     if let Ok(mut file) = std::fs::OpenOptions::new()
                         .create(true)
@@ -2788,7 +2788,7 @@ fn run() -> Result<(), String> {
                     match result {
                         Ok(status) => state.root = status,
                         Err(error) => {
-                            eprintln!("Luma root features: {error}");
+                            eprintln!("Sera root features: {error}");
                             state.notify("Root features could not be changed");
                         }
                     }
@@ -3754,7 +3754,7 @@ fn run() -> Result<(), String> {
                 match window.set_size(target.width, target.height) {
                     Ok(()) => {
                         eprintln!(
-                            "Luma resolution change {}x{} -> {}x{} (same EGL context)",
+                            "Sera resolution change {}x{} -> {}x{} (same EGL context)",
                             applied_surface.width,
                             applied_surface.height,
                             target.width,
@@ -3768,7 +3768,7 @@ fn run() -> Result<(), String> {
                     }
                     Err(error) => {
                         eprintln!(
-                            "Luma live resolution change rejected: {error}; restoring previous preference"
+                            "Sera live resolution change rejected: {error}; restoring previous preference"
                         );
                         state.preferences.ui_resolution = last_working_choice;
                         state.preferences.auto_ui_cap = last_working_auto;
@@ -3842,7 +3842,7 @@ fn run() -> Result<(), String> {
                 (state.page, state.scroll) = shown;
                 renderer.prepare(&ahead.draw);
                 if prof_slow.is_some() {
-                    eprintln!("LUMA_WARM {page:?}");
+                    eprintln!("SERA_WARM {page:?}");
                 }
             }
         }
@@ -3928,7 +3928,7 @@ fn run() -> Result<(), String> {
                         if p95 > 18.5 && mean > 17.5 {
                             let new_cap = state.preferences.resolved_ui_resolution().lower();
                             eprintln!(
-                                "LUMA_AUTO_RESOLUTION_DOWNGRADE {} -> {} p95_ms={p95:.2} mean_ms={mean:.2} samples={}",
+                                "SERA_AUTO_RESOLUTION_DOWNGRADE {} -> {} p95_ms={p95:.2} mean_ms={mean:.2} samples={}",
                                 state.preferences.resolved_ui_resolution().short(),
                                 new_cap.short(),
                                 sorted.len()
@@ -3950,7 +3950,7 @@ fn run() -> Result<(), String> {
                     if webos {
                         let stats = renderer.stats();
                         eprintln!(
-                            "Luma vector text: {} glyphs, {} text runs, {} KiB glyph geometry, {} KiB GPU text",
+                            "Sera vector text: {} glyphs, {} text runs, {} KiB glyph geometry, {} KiB GPU text",
                             stats.cached_glyphs,
                             stats.cached_text_runs,
                             stats.glyph_geometry_bytes / 1024,
@@ -3966,7 +3966,7 @@ fn run() -> Result<(), String> {
                         if delta > limit {
                             let stats = renderer.stats();
                             eprintln!(
-                                "LUMA_SLOW frame={presented} dt={delta:.1} cpu={:.1} build={:.1} tess={} page={:?} focus={:?}",
+                                "SERA_SLOW frame={presented} dt={delta:.1} cpu={:.1} build={:.1} tess={} page={:?} focus={:?}",
                                 stats.cpu_submission_ms,
                                 stats.build_ms,
                                 stats.glyph_tessellations,
@@ -3988,7 +3988,7 @@ fn run() -> Result<(), String> {
                 if last_drawable != Some(drawable) {
                     if options.diagnostics.is_some() || options.resolution.is_some() {
                         eprintln!(
-                            "Luma drawable: {}x{}, density {:.3}x, 4K buffer: {}",
+                            "Sera drawable: {}x{}, density {:.3}x, 4K buffer: {}",
                             width,
                             height,
                             drawable.scale(),

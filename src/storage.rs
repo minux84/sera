@@ -15,7 +15,7 @@ pub fn default_path(webos: bool) -> Result<PathBuf, String> {
         .map(PathBuf::from)
         .or_else(|| std::env::var_os("HOME").map(|p| PathBuf::from(p).join(".config")))
         .ok_or("Set HOME, XDG_CONFIG_HOME or --preferences for native preferences")?;
-    Ok(base.join("luma-native/preferences.json"))
+    Ok(base.join("sera-native/preferences.json"))
 }
 
 #[cfg(all(feature = "webos", unix))]
@@ -83,7 +83,7 @@ fn tv_path() -> Result<PathBuf, String> {
                 .mode(0o600)
                 .open(&probe)?;
             let result = file
-                .write_all(b"Luma storage probe")
+                .write_all(b"Sera storage probe")
                 .and_then(|_| file.sync_all());
             drop(file);
             // Only remove a probe that this process created successfully.
@@ -110,7 +110,7 @@ fn tv_path() -> Result<PathBuf, String> {
                     preferences.sanitize();
                     save(&path, &preferences)?;
                     eprintln!(
-                        "Luma preferences migrated from {} to {}",
+                        "Sera preferences migrated from {} to {}",
                         legacy.display(),
                         path.display()
                     );
@@ -129,10 +129,10 @@ fn tv_path() -> Result<PathBuf, String> {
                 && let Some(reading) = crate::weather_service::load_cache(&old_cache)
                 && let Err(error) = crate::weather_service::save_cache(&cache, &reading)
             {
-                eprintln!("Luma weather cache migration: {error}");
+                eprintln!("Sera weather cache migration: {error}");
             }
         }
-        eprintln!("Luma persistent storage: {}", directory.display());
+        eprintln!("Sera persistent storage: {}", directory.display());
         return Ok(path);
     }
     Err(format!(

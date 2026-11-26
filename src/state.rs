@@ -377,7 +377,7 @@ pub enum Effect {
     AlbumDetails(i64),
     /// Play an album from this song, in order or shuffled.
     AlbumPlay(i64, usize, bool),
-    /// Play the Steam trailer of the open game card in Luma's player.
+    /// Play the Steam trailer of the open game card in Sera's player.
     GameTrailer,
     /// Fetch cards for every configured stack.
     StacksRefresh,
@@ -483,7 +483,7 @@ pub struct State {
     /// Steam store details per Apollo app id, filled in the background.
     pub game_info: std::collections::HashMap<i64, crate::steam::GameInfo>,
     pub moonlight_pending: Option<i64>,
-    /// Luma started a Moonlight stream; on return ask Apollo whether it still runs.
+    /// Sera started a Moonlight stream; on return ask Apollo whether it still runs.
     pub moonlight_launched: bool,
     pub game: Option<GameCard>,
     /// The game card fading out after Close/Back, as on the movie card.
@@ -557,7 +557,7 @@ pub struct State {
     /// queue up in front of a title that was actually opened.
     pub movie_prefetch_busy: Option<(i64, Instant)>,
     /// media item playing in the web player: its card refreshes watched
-    /// marks and progress when Luma comes back to the foreground.
+    /// marks and progress when Sera comes back to the foreground.
     pub web_player_item: Option<i64>,
     pub notice: Option<(String, Instant)>,
     pub error: Option<String>,
@@ -3960,7 +3960,7 @@ impl State {
                                 }
                             }
                             self.moonlight_games.clear();
-                            self.moonlight_status = Some("Luma unpaired".into());
+                            self.moonlight_status = Some("Sera unpaired".into());
                         }
                         6 => {
                             self.preferences.stacks.remove(i);
@@ -4566,7 +4566,7 @@ impl State {
                         return vec![Effect::Root(Some(change))];
                     }
                     7 => return vec![Effect::Launch("com.webos.app.home".into())],
-                    8 => return vec![Effect::Launch("com.denisefremov.luma.aerials".into())],
+                    8 => return vec![Effect::Launch("it.bytebuilder.sera.aerials".into())],
                     6 => {
                         self.subpage = Some(Subpage::Greeting);
                         self.focus = Target::GreetingStyle;

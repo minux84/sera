@@ -183,7 +183,7 @@ fn inventory_visibility_cases_match_the_launcher_filters() {
 
 #[test]
 fn asset_loading_and_unknown_app_cards_do_not_require_collected_artwork() {
-    let root = std::env::temp_dir().join(format!("luma-assets-no-dumps-{}", std::process::id()));
+    let root = std::env::temp_dir().join(format!("sera-assets-no-dumps-{}", std::process::id()));
     std::fs::create_dir_all(&root).unwrap();
     std::fs::write(root.join("version.txt"), "test").unwrap();
     std::fs::write(root.join("font-metrics.json"), "{}").unwrap();
@@ -239,7 +239,7 @@ fn auto_input_visibility_requires_a_positive_connection_report() {
 
 #[test]
 fn preferences_round_trip_and_corrupt_data_is_not_silently_overwritten() {
-    let directory = std::env::temp_dir().join(format!("luma-native-test-{}", std::process::id()));
+    let directory = std::env::temp_dir().join(format!("sera-native-test-{}", std::process::id()));
     let path = directory.join("preferences.json");
     let mut preferences = Preferences {
         favorites: Some(vec![]),
@@ -1592,7 +1592,7 @@ fn video_storage_migrates_old_mask_without_touching_other_fields() {
     data.insert("greeting_name".into(), json!("Tester"));
     data.insert("input_names".into(), json!({"com.webos.app.hdmi1":"BEAST"}));
     let path =
-        std::env::temp_dir().join(format!("luma-round03-migrate-{}.json", std::process::id()));
+        std::env::temp_dir().join(format!("sera-round03-migrate-{}.json", std::process::id()));
     std::fs::write(&path, serde_json::to_vec(&prefs).unwrap()).unwrap();
     let migrated = storage::load(&path).unwrap();
     assert_eq!(
@@ -3488,14 +3488,14 @@ fn unsupported_saved_media_source_is_ignored_without_losing_other_settings() {
             {"source": "jellyfin", "collection": "recent", "name": "Recent media"}
         ],
         "former_account": {"unexpected": "value"},
-        "luma_player": true
+        "sera_player": true
     });
     let mut prefs: crate::model::Preferences = serde_json::from_value(saved).unwrap();
     prefs.sanitize();
     assert_eq!(prefs.stacks.len(), 1);
     assert_eq!(prefs.stacks[0].source, "jellyfin");
     assert_eq!(prefs.stacks[0].collection, "recent");
-    assert!(prefs.luma_player);
+    assert!(prefs.sera_player);
 }
 
 #[test]

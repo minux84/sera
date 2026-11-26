@@ -1,5 +1,5 @@
 {
-  "name": "lg-luma",
+  "name": "sera",
   "version": "2.2.160",
   "private": true,
   "description": "A modern, remote-first webOS launcher.",
@@ -13,12 +13,12 @@
   "scripts": {
     "dev": "cargo run --locked --",
     "build": "sh tools/build-webos.sh",
-    "build:fast": "LUMA_PROFILE=release-dev sh tools/build-webos.sh",
+    "build:fast": "SERA_PROFILE=release-dev sh tools/build-webos.sh",
     "package": "pnpm assets && pnpm build && node tools/package.mjs && node tools/repository.mjs",
     "deploy": "pnpm run package && node tools/deploy.mjs",
-    "deploy:fast": "LUMA_PROFILE=release-dev pnpm run package && node tools/deploy.mjs",
+    "deploy:fast": "SERA_PROFILE=release-dev pnpm run package && node tools/deploy.mjs",
     "deploy:root": "pnpm run package && node tools/deploy-root.mjs",
-    "deploy:root:fast": "LUMA_PROFILE=release-dev pnpm run package && node tools/deploy-root.mjs",
+    "deploy:root:fast": "SERA_PROFILE=release-dev pnpm run package && node tools/deploy-root.mjs",
     "install:root": "node tools/deploy-root.mjs",
     "restart:root": "node tools/deploy-root.mjs --restart",
     "test": "pnpm test:release && pnpm test:home && pnpm test:icons && cargo test --locked --workspace --all-features",

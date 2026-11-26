@@ -15,7 +15,7 @@ test('the system-home helper refuses takeover without invoking native commands',
     require: () => assert.fail('Home takeover helper must not read system modules'),
   });
   vm.runInContext(source, context, { timeout: 2000 });
-  assert.deepEqual(calls, ['Luma: home takeover intentionally disabled.', 1]);
+  assert.deepEqual(calls, ['Sera: home takeover intentionally disabled.', 1]);
 });
 
 test('the shell home helper deliberately refuses takeover', async () => {
@@ -31,7 +31,7 @@ test('autostart remains an explicit opt-in rather than a default takeover', asyn
 });
 
 test('wake script targets the public launcher id and not the original beta app', async () => {
-  const source = await file('luma-wake.sh');
-  assert.match(source, /com\.denisefremov\.luma/);
+  const source = await file('sera-wake.sh');
+  assert.match(source, /it\.bytebuilder\.sera/);
   assert.match(source, /luna-send/);
 });

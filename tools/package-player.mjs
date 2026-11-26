@@ -7,8 +7,8 @@ import { createHash } from 'node:crypto';
 const root = path.resolve(import.meta.dirname, '..');
 const directory = path.join(root, 'extras/player/app');
 const manifest = JSON.parse(await fs.readFile(path.join(directory, 'appinfo.json'), 'utf8'));
-if (manifest.id !== 'com.denisefremov.luma.player' || manifest.type !== 'web') {
-  throw new Error('Unexpected Luma Player identity or app type');
+if (manifest.id !== 'it.bytebuilder.sera.player' || manifest.type !== 'web') {
+  throw new Error('Unexpected Sera Player identity or app type');
 }
 const output = path.join(root, 'dist');
 await fs.mkdir(output, { recursive: true });
@@ -29,7 +29,7 @@ if (result.error) throw result.error;
 if (result.status !== 0) process.exit(result.status ?? 1);
 const filename = `${manifest.id}_${manifest.version}_all.ipk`;
 const bytes = await fs.readFile(path.join(output, filename));
-if (bytes.subarray(0, 8).toString() !== '!<arch>\n') throw new Error('Invalid Luma Player IPK');
+if (bytes.subarray(0, 8).toString() !== '!<arch>\n') throw new Error('Invalid Sera Player IPK');
 const hash = createHash('sha256').update(bytes).digest('hex');
 const checksumsPath = path.join(output, 'sha256sums');
 const previous = await fs.readFile(checksumsPath, 'utf8');

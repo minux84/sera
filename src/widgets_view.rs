@@ -218,7 +218,7 @@ fn synthetic(code: u8, is_day: bool, temperature: f64) -> Reading {
     }
 }
 /// The sky mood and reading Home shows; desktop QA can force a mood with
-/// LUMA_WEATHER_PREVIEW_MOOD.
+/// SERA_WEATHER_PREVIEW_MOOD.
 pub(super) fn weather_now(state: &State) -> (Mood, Option<Reading>) {
     let real = state
         .preferences
@@ -226,7 +226,7 @@ pub(super) fn weather_now(state: &State) -> (Mood, Option<Reading>) {
         .as_ref()
         .and_then(|place| state.weather.reading(place));
     #[cfg(debug_assertions)]
-    let preview = std::env::var("LUMA_WEATHER_PREVIEW_MOOD")
+    let preview = std::env::var("SERA_WEATHER_PREVIEW_MOOD")
         .ok()
         .and_then(|name| Mood::from_name(&name));
     #[cfg(not(debug_assertions))]

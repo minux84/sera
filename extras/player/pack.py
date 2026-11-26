@@ -35,7 +35,7 @@ for root, dirs, files in os.walk(app):
         entries.append((f"{base}/{rel}/{f}".replace("/./", "/"), data, 0o644))
 data_tgz = tgz(entries)
 control = (f"Package: {aid}\nVersion: {ver}\nSection: misc\nPriority: optional\n"
-           f"Architecture: all\nInstalled-Size: {size}\nMaintainer: Luma\n"
+           f"Architecture: all\nInstalled-Size: {size}\nMaintainer: Sera\n"
            f"Description: {info['title']}\nwebOS-Package-Format-Version: 2\n"
            f"webOS-Packager-Version: x.y.x\n").encode()
 control_tgz = tgz([("./", None, 0), ("./control", control, 0o644)])

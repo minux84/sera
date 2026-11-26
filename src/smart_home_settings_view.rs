@@ -392,13 +392,13 @@ fn connect(out: &mut Scene, state: &State, assets: &Assets) {
         [
             "1. Scan with your phone camera",
             "2. Paste a long-lived access token",
-            "3. Luma connects by itself",
+            "3. Sera connects by itself",
         ]
     } else {
         [
             "1. Scan with your phone camera",
             "2. Sign in to Home Assistant",
-            "3. Luma connects by itself",
+            "3. Sera connects by itself",
         ]
     };
     for (i, step) in steps.iter().enumerate() {

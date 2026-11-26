@@ -1,6 +1,6 @@
 //! Background music (Jellyfin albums): one mpg123 in remote mode (-R) plays
-//! the queue through PulseAudio, so songs go on while Luma shows other pages
-//! or another app is in front. Luma only sends commands and reads its state.
+//! the queue through PulseAudio, so songs go on while Sera shows other pages
+//! or another app is in front. Sera only sends commands and reads its state.
 use crate::player::{Music, MusicSong};
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, ChildStdin, Command, Stdio};
@@ -127,7 +127,7 @@ impl Drop for Engine {
 }
 
 fn pid_file() -> std::path::PathBuf {
-    std::env::temp_dir().join("luma-music.pid")
+    std::env::temp_dir().join("sera-music.pid")
 }
 
 impl Engine {
@@ -167,7 +167,7 @@ impl Engine {
         if self.child.is_some() {
             return true;
         }
-        // An mpg123 left by an earlier Luma that did not close cleanly.
+        // An mpg123 left by an earlier Sera that did not close cleanly.
         if let Ok(pid) = std::fs::read_to_string(pid_file())
             && let Ok(pid) = pid.trim().parse::<i32>()
         {
@@ -207,7 +207,7 @@ impl Engine {
         self.stdin = child.stdin.take();
         self.child = Some(child);
         self.events = Some(rx);
-        // Only the answers Luma asks for: no line per decoded frame.
+        // Only the answers Sera asks for: no line per decoded frame.
         self.send("SILENCE");
         true
     }

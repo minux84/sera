@@ -155,7 +155,7 @@ fn thumb_service() -> &'static ThumbService {
                 .timeout_global(Some(std::time::Duration::from_secs(20)))
                 .build()
                 .new_agent();
-            let cache = std::env::temp_dir().join("luma-media-stills");
+            let cache = std::env::temp_dir().join("sera-media-stills");
             let _ = std::fs::create_dir_all(&cache);
             for (id, list) in inbox {
                 let done = list

@@ -1,14 +1,12 @@
-# Luma: LG webOS TV Launcher
+# Sera: LG webOS TV Launcher
 
 **A fast, remote-first launcher and home screen for LG webOS TVs, with an Apple TV feel.**
 
-Luma replaces the cluttered LG Home with one calm screen: your favorite apps, live video wallpapers, widgets, your Jellyfin library, your PC games over Moonlight and your Home Assistant devices. It's a native Rust app drawn with OpenGL ES, so it stays smooth on TV hardware.
+Sera replaces the cluttered LG Home with one calm screen: your favorite apps, live video wallpapers, widgets, your Jellyfin library, your PC games over Moonlight and your Home Assistant devices. It's a native Rust app drawn with OpenGL ES, so it stays smooth on TV hardware.
 
 Free and open source (MIT). Fork it, change it, ship it.
 
-<a href="https://github.com/funnymataleao/luma-webos-launcher/releases/download/v2.2.160/Luma-promo.mp4"><img src="docs/promo-preview.webp" width="100%" alt="Luma promo video"></a>
-
-▶ [Watch the full promo video (1 min)](https://github.com/funnymataleao/luma-webos-launcher/releases/download/v2.2.160/Luma-promo.mp4)
+> Sera is a fork of **[Luma](https://github.com/funnymataleao/luma-webos-launcher)** by [Denis Efremov](https://denisefremov.com), renamed and developed independently. It is not affiliated with or endorsed by the Luma project. See [Credits](#credits).
 
 ![Home](docs/screenshots/home.jpg)
 
@@ -34,7 +32,7 @@ Free and open source (MIT). Fork it, change it, ship it.
 
 - Sign in with a code or a QR code on your phone: no typing with the remote.
 - Movie and series pages with backdrop, cast, seasons, episodes and "More like this".
-- A built-in HTML5 player (`com.denisefremov.luma.player`) with audio and subtitle track selection, quality and seek previews. Playback progress syncs back to your server.
+- A built-in HTML5 player (`it.bytebuilder.sera.player`) with audio and subtitle track selection, quality and seek previews. Playback progress syncs back to your server.
 - Music: albums, songs and a now-playing screen.
 - Plex support is new and less tested than Jellyfin.
 
@@ -130,30 +128,19 @@ Free and open source (MIT). Fork it, change it, ship it.
   </tr>
 </table>
 
-## Support Luma
-
-Luma is built and maintained by one person in their free time. It's free and will stay free. Donations decide how much time goes into it: they keep updates coming, pay for test hardware and move the roadmap forward (Plex, more TV models, new widgets). If Luma makes your TV better, a coffee helps keep it alive.
-
-Made by [Denis Efremov](https://denisefremov.com), an interface designer with 16+ years of experience and the maker of Luma and Rift, two free open-source launchers. Read the design story in the [Luma case study](https://denisefremov.com/work/luma.html).
-
-- ☕ **Ko-fi:** [ko-fi.com/dennis_oizo](https://ko-fi.com/dennis_oizo)
-- 🍵 **Buy Me a Coffee:** [buymeacoffee.com/denisefremov](https://buymeacoffee.com/denisefremov)
-- 💖 **GitHub Sponsors:** [github.com/sponsors/funnymataleao](https://github.com/sponsors/funnymataleao)
-- 🪙 **USDT (TRC20):** `TKPVRy9oYjLsbQMtbDzvkXDu73mg7tLN5u`
-
 ## Root features
 
-Luma runs as a normal app without root. On a rooted TV (Homebrew Channel, elevated), **Settings › System › Root features** appears with extras:
+Sera runs as a normal app without root. On a rooted TV (Homebrew Channel, elevated), **Settings › System › Root features** appears with extras:
 
 | Feature                                                    | Without root | With root       |
 | ---------------------------------------------------------- | ------------ | --------------- |
-| Open Luma when the TV turns on                             | —            | ✓               |
-| Turn LG Home "Auto Launch" off from Luma                   | —            | ✓               |
+| Open Sera when the TV turns on                             | —            | ✓               |
+| Turn LG Home "Auto Launch" off from Sera                   | —            | ✓               |
 | Leave a Moonlight stream with Start + Select pressed twice | —            | ✓               |
 | Full app and HDMI input list, app icons                    | basic        | ✓ more reliable |
 | Detect whether an HDMI input has a signal                  | —            | ✓               |
 
-Without root the Root features section is hidden, and Luma never tries to change system files.
+Without root the Root features section is hidden, and Sera never tries to change system files.
 
 ## Install
 
@@ -162,18 +149,18 @@ Without root the Root features section is hidden, and Luma never tries to change
 Add this repository in Homebrew Channel › Settings › Repositories:
 
 ```text
-https://github.com/funnymataleao/luma-webos-launcher/releases/latest/download/repo.json
+https://github.com/minux84/sera/releases/latest/download/repo.json
 ```
 
-Then install **Luma** and **Luma Player** from the list. The companion player is required for Jellyfin and Plex video playback.
+Then install **Sera** and **Sera Player** from the list. The companion player is required for Jellyfin and Plex video playback.
 
 ### Manual (IPK)
 
-Download `com.denisefremov.luma_2.2.160_arm.ipk` from [Releases](../../releases/latest) and install it with
+Download `it.bytebuilder.sera_2.2.160_arm.ipk` from [Releases](../../releases/latest) and install it with
 [webOS Dev Manager](https://github.com/webosbrew/dev-manager-desktop) or `ares-install`.
-To play Jellyfin and Plex videos, also install `com.denisefremov.luma.player_0.0.11_all.ipk` from the same release.
+To play Jellyfin and Plex videos, also install `it.bytebuilder.sera.player_0.0.11_all.ipk` from the same release.
 
-To use Moonlight, install Moonlight for webOS and pair it with your PC first, then open Luma.
+To use Moonlight, install Moonlight for webOS and pair it with your PC first, then open Sera.
 
 ## Build from source
 
@@ -221,18 +208,26 @@ Tests: `pnpm test`. Lint and format: `pnpm check`, `pnpm format`. More in [devel
 ## Fonts and assets
 
 All bundled fonts are under the SIL Open Font License; each font ships with its `OFL.txt`. See [assets.md](assets.md) for wallpapers, icons and their licenses.
-Brand logos belong to their owners. Luma is not affiliated with LG, Apple, Amazon, Valve, Jellyfin, Plex or Home Assistant.
+Brand logos belong to their owners. Sera is not affiliated with LG, Apple, Amazon, Valve, Jellyfin, Plex or Home Assistant.
 
 ## Credits
 
-Luma started as a fork of **[ecklf/lg-luma](https://github.com/ecklf/lg-luma)** by ecklf and contributors. Thank you for the native renderer, the build pipeline and the original idea.
+Sera is a fork of **[Luma](https://github.com/funnymataleao/luma-webos-launcher)**, designed and built by [Denis Efremov](https://denisefremov.com) ([@funnymataleao](https://github.com/funnymataleao)). Almost everything you see here, from the interface and the renderer to the media, widget and smart-home features, comes from Luma. Sera continues that work under a new name.
+
+Luma itself started as a fork of **[ecklf/lg-luma](https://github.com/ecklf/lg-luma)** by ecklf and contributors, which provided the native renderer, the build pipeline and the original idea.
+
+If you like this launcher, please consider supporting the original author:
+
+- ☕ **Ko-fi:** [ko-fi.com/dennis_oizo](https://ko-fi.com/dennis_oizo)
+- 🍵 **Buy Me a Coffee:** [buymeacoffee.com/denisefremov](https://buymeacoffee.com/denisefremov)
+- 💖 **GitHub Sponsors:** [github.com/sponsors/funnymataleao](https://github.com/sponsors/funnymataleao)
 
 Also thanks to [webOS Homebrew](https://www.webosbrew.org/), [Moonlight](https://moonlight-stream.org/), [Sunshine](https://github.com/LizardByte/Sunshine) / [Apollo](https://github.com/ClassicOldSong/Apollo), [Jellyfin](https://jellyfin.org/) and [Home Assistant](https://www.home-assistant.io/).
 
 ## How this was made
 
-Most of the code in this fork was written with AI coding assistants (Claude Code and OpenAI Codex), directed and tested on a real LG OLED C1 by the maintainer. Every change was checked on the TV before release.
+Most of the Luma code that Sera builds on was written with AI coding assistants (Claude Code and OpenAI Codex), directed and tested by its author on a real LG OLED C1.
 
 ## License
 
-[MIT](license). Original copyright © 2026 Luma contributors.
+[MIT](license). Copyright © 2026 Luma contributors and © 2026 Carmine Savino (Sera changes). The original MIT notice is preserved in [license](license).

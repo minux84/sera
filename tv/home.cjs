@@ -1,2 +1,2 @@
-console.error('Luma: home takeover intentionally disabled.');
+console.error('Sera: home takeover intentionally disabled.');
 process.exit(1);

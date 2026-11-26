@@ -31,7 +31,7 @@ static int write_header(uint32_t length,uint64_t pts,uint64_t presentation,bool 
 }
 int main(int argc,char **argv){
     if(argc!=3 || (strcmp(argv[1],"h264") && strcmp(argv[1],"h265")) || strncmp(argv[2],"https://",8)!=0 || strlen(argv[2])>2048){
-        fprintf(stderr,"Usage: luma-demux h264|h265 HTTPS_VIDEO_URL\n");return 2;
+        fprintf(stderr,"Usage: sera-demux h264|h265 HTTPS_VIDEO_URL\n");return 2;
     }
     signal(SIGTERM,sigterm);signal(SIGPIPE,SIG_IGN);
     gst_init(NULL,NULL);
@@ -91,7 +91,7 @@ int main(int argc,char **argv){
                     ? GST_BUFFER_DURATION(buf) : GST_SECOND/30;
                 if(duration<10*GST_MSECOND || duration>100*GST_MSECOND)
                     duration=GST_SECOND/30;
-                if(separate_pts && getenv("LUMA_H264_FIXED_30"))
+                if(separate_pts && getenv("SERA_H264_FIXED_30"))
                     duration=GST_SECOND/30;
                 decode_clock += duration;
                 uint64_t presentation=pts;

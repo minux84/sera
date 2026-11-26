@@ -357,7 +357,7 @@ fn general(p: &mut Pen, state: &State, t: f64) {
         p.style(24., 600, false),
         c(0xffffff, 0.68),
     );
-    // Greetings in every Luma language, two seconds each, rising in and out.
+    // Greetings in every Sera language, two seconds each, rising in and out.
     let words = ["Hello", "Hallo", "¡Hola!", "Olá", "你好"];
     let greet = p.style(56., 700, true);
     for (i, word) in words.iter().enumerate() {
@@ -901,7 +901,7 @@ fn system(p: &mut Pen, state: &State, assets: &Assets, t: f64) {
     // Version and root badges share one width.
     let style = p.style(22., 700, false);
     let root = state.root.is_some();
-    let version = format!("Luma {}", assets.version.trim());
+    let version = format!("Sera {}", assets.version.trim());
     let badges = [version.as_str(), if root { "Root" } else { "No root" }];
     for (i, label) in badges.iter().enumerate() {
         let x = 110. + 216. * i as f32;

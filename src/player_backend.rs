@@ -91,7 +91,7 @@ fn stream_resolution(url: &str) -> Option<(i32, i32)> {
         .new_agent();
     let text = agent
         .get(url)
-        .header("User-Agent", "Mozilla/5.0 (Web0S; Linux) Luma")
+        .header("User-Agent", "Mozilla/5.0 (Web0S; Linux) Sera")
         .call()
         .ok()?
         .body_mut()
@@ -258,7 +258,7 @@ fn video_size(event: &serde_json::Value) -> Option<(i32, i32)> {
 
 #[cfg(all(feature = "webos", target_os = "linux", target_arch = "arm"))]
 mod native {
-    //! Thin dlopen wrapper around libluma_cinema.so (window helpers + C facade).
+    //! Thin dlopen wrapper around libsera_cinema.so (window helpers + C facade).
     use std::ffi::{CStr, CString, c_char, c_void};
     pub struct Native {
         library: *mut c_void,
@@ -268,7 +268,7 @@ mod native {
         pub fn load() -> Self {
             let library = std::env::current_exe()
                 .ok()
-                .and_then(|exe| exe.parent().map(|p| p.join("lib/libluma_cinema.so")))
+                .and_then(|exe| exe.parent().map(|p| p.join("lib/libsera_cinema.so")))
                 .and_then(|p| CString::new(p.to_string_lossy().as_bytes()).ok())
                 .map_or(std::ptr::null_mut(), |p| unsafe {
                     libc::dlopen(p.as_ptr(), libc::RTLD_NOW | libc::RTLD_LOCAL)
@@ -289,7 +289,7 @@ mod native {
         pub fn facade(&mut self) -> *mut c_void {
             if self.handle.is_null()
                 && let Some(f) =
-                    self.sym::<unsafe extern "C" fn() -> *mut c_void>(b"luma_cinema_create\0")
+                    self.sym::<unsafe extern "C" fn() -> *mut c_void>(b"sera_cinema_create\0")
             {
                 self.handle = unsafe { f() };
             }
@@ -297,19 +297,19 @@ mod native {
         }
         pub fn window_create(&self) -> Option<CString> {
             let f = self
-                .sym::<unsafe extern "C" fn() -> *const c_char>(b"luma_cinema_window_create\0")?;
+                .sym::<unsafe extern "C" fn() -> *const c_char>(b"sera_cinema_window_create\0")?;
             let id = unsafe { f() };
             (!id.is_null()).then(|| unsafe { CStr::from_ptr(id) }.to_owned())
         }
         pub fn window_fit(&self, id: &CStr, w: i32, h: i32) -> bool {
             self.sym::<unsafe extern "C" fn(*const c_char, i32, i32) -> i32>(
-                b"luma_cinema_window_fit\0",
+                b"sera_cinema_window_fit\0",
             )
             .is_some_and(|f| unsafe { f(id.as_ptr(), w, h) } != 0)
         }
         pub fn window_destroy(&self, id: &CStr) {
             if let Some(f) =
-                self.sym::<unsafe extern "C" fn(*const c_char)>(b"luma_cinema_window_destroy\0")
+                self.sym::<unsafe extern "C" fn(*const c_char)>(b"sera_cinema_window_destroy\0")
             {
                 unsafe { f(id.as_ptr()) }
             }
@@ -320,7 +320,7 @@ mod native {
             unsafe {
                 if !self.handle.is_null()
                     && let Some(f) =
-                        self.sym::<unsafe extern "C" fn(*mut c_void)>(b"luma_cinema_destroy\0")
+                        self.sym::<unsafe extern "C" fn(*mut c_void)>(b"sera_cinema_destroy\0")
                 {
                     f(self.handle)
                 }
@@ -358,7 +358,7 @@ impl Backend {
     const MEDIA: &'static str = "luna://com.webos.media/";
     fn new() -> Self {
         // Fresh log per run; append mode because the native side writes too.
-        let path = "/media/developer/com.denisefremov.luma/luma-cinema.log";
+        let path = "/media/developer/it.bytebuilder.sera/sera-cinema.log";
         let _ = std::fs::write(path, "");
         let log = std::fs::OpenOptions::new()
             .create(true)
@@ -371,7 +371,7 @@ impl Backend {
             media: None,
             window: None,
             legacy: false,
-            // Off until proven: a direct load from Luma crashed umediaserver
+            // Off until proven: a direct load from Sera crashed umediaserver
             // (strlen in libums_connector, 25.10 12:06) and the TV rebooted.
             denied: true,
             loaded: false,
@@ -399,7 +399,7 @@ impl Backend {
     }
     fn window_mode() -> &'static str {
         // Escape hatch for on-TV diagnosis without a rebuild.
-        match std::fs::read_to_string("/media/developer/com.denisefremov.luma/cinema-window") {
+        match std::fs::read_to_string("/media/developer/it.bytebuilder.sera/cinema-window") {
             Ok(s) if s.trim() == "none" => "none",
             _ => "export",
         }
@@ -459,7 +459,7 @@ impl Backend {
             return self.open_legacy(url);
         }
         let mode = Self::window_mode();
-        let mut option = serde_json::json!({ "appId": "com.denisefremov.luma" });
+        let mut option = serde_json::json!({ "appId": "it.bytebuilder.sera" });
         if mode == "export" {
             self.window = self.native.window_create();
             if let Some(id) = self.window.as_ref() {
@@ -521,7 +521,7 @@ impl Backend {
         self.note(format!("open via C facade, video {}x{}", size.0, size.1));
         if let Some(f) = self
             .native
-            .sym::<unsafe extern "C" fn(*mut libc::c_void, i32, i32)>(b"luma_cinema_video_size\0")
+            .sym::<unsafe extern "C" fn(*mut libc::c_void, i32, i32)>(b"sera_cinema_video_size\0")
         {
             unsafe { f(h, size.0, size.1) };
         }
@@ -529,7 +529,7 @@ impl Backend {
             && self
                 .native
                 .sym::<unsafe extern "C" fn(*mut libc::c_void, *const libc::c_char) -> i32>(
-                    b"luma_cinema_open\0",
+                    b"sera_cinema_open\0",
                 )
                 .is_some_and(|f| unsafe { f(h, c.as_ptr()) } != 0);
         self.legacy = ok;
@@ -629,7 +629,7 @@ impl Backend {
         let h = self.native.facade();
         self.native
             .sym::<unsafe extern "C" fn(*mut libc::c_void, i32, i64) -> i32>(
-                b"luma_cinema_control\0",
+                b"sera_cinema_control\0",
             )
             .is_some_and(|f| unsafe { f(h, op, value) } != 0)
     }
@@ -679,21 +679,21 @@ impl Backend {
         if self.legacy {
             return self
                 .native
-                .sym::<unsafe extern "C" fn(*mut libc::c_void) -> i32>(b"luma_cinema_state\0")
+                .sym::<unsafe extern "C" fn(*mut libc::c_void) -> i32>(b"sera_cinema_state\0")
                 .map_or(-1, |f| unsafe { f(self.native.handle) });
         }
         self.state
     }
     fn position(&self) -> u64 {
         if self.legacy {
-            self.legacy_value(b"luma_cinema_position\0").max(0) as u64
+            self.legacy_value(b"sera_cinema_position\0").max(0) as u64
         } else {
             self.position
         }
     }
     fn duration(&self) -> u64 {
         if self.legacy {
-            self.legacy_value(b"luma_cinema_duration\0").max(0) as u64
+            self.legacy_value(b"sera_cinema_duration\0").max(0) as u64
         } else {
             self.duration
         }

@@ -1,4 +1,4 @@
-//! Shared, interruptible motion tokens for Luma's native draw-list UI.
+//! Shared, interruptible motion tokens for Sera's native draw-list UI.
 use crate::{renderer::Draw, state::Rect};
 pub const FOCUS_IN: f32 = 0.160;
 pub const FOCUS_OUT: f32 = 0.160;

@@ -300,8 +300,8 @@ pub struct Preferences {
     pub games: crate::moonlight::GameLibrary,
     /// Last playback position, keyed by media item ID; never stores URLs or tokens.
     pub playback_progress: BTreeMap<String, u64>,
-    /// Play opens Luma's own player instead of the TV's (Settings › Player).
-    pub luma_player: bool,
+    /// Play opens Sera's own player instead of the TV's (Settings › Player).
+    pub sera_player: bool,
     /// Home widgets right of the headline (Settings › Widgets).
     pub widgets: crate::widgets::WidgetPrefs,
 }
@@ -350,7 +350,7 @@ impl Default for Preferences {
             plex: Default::default(),
             games: Default::default(),
             playback_progress: BTreeMap::new(),
-            luma_player: true,
+            sera_player: true,
             widgets: Default::default(),
         }
     }

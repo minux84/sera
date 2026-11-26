@@ -82,7 +82,7 @@ impl Service {
 /// fills the rect it is given, so crop the middle to the panel's shape once.
 const PANEL_ASPECT: f32 = 1776. / 952.;
 
-/// Artwork set this Luma fetches (2: the upright library poster).
+/// Artwork set this Sera fetches (2: the upright library poster).
 const ART_VERSION: u32 = 2;
 
 /// Store art URLs of one app by asset name (library_hero, library_capsule_2x…).
@@ -180,7 +180,7 @@ fn cached(cache: &Path, title: &str) -> Option<GameInfo> {
         .and_then(|t| SystemTime::now().duration_since(t).ok())?;
     let info: GameInfo = serde_json::from_slice(&fs::read(&path).ok()?).ok()?;
     // Misses are retried daily, hits refreshed weekly; a hit without key art
-    // or full screenshots (older Luma) is fetched again now.
+    // or full screenshots (older Sera) is fetched again now.
     if info.steam_id > 0
         && (info.hero.is_none()
             || info.screenshots_full.len() < info.screenshots.len()
@@ -382,7 +382,7 @@ mod tests {
 
     #[test]
     fn hero_is_cropped_to_the_panel_not_stretched() {
-        let dir = std::env::temp_dir().join("luma-steam-fit-test");
+        let dir = std::env::temp_dir().join("sera-steam-fit-test");
         let _ = fs::create_dir_all(&dir);
         let path = dir.join("steam-1-hero.jpg");
         image::RgbImage::new(3840, 1240).save(&path).unwrap();
@@ -410,9 +410,9 @@ mod tests {
     #[test]
     #[ignore]
     fn live_steam_lookup() {
-        let dir = std::env::temp_dir().join("luma-steam-test");
+        let dir = std::env::temp_dir().join("sera-steam-test");
         let _ = fs::remove_dir_all(&dir);
-        let title = std::env::var("LUMA_STEAM_TITLE").unwrap_or_else(|_| "007 First Light".into());
+        let title = std::env::var("SERA_STEAM_TITLE").unwrap_or_else(|_| "007 First Light".into());
         let info = lookup(&title, &dir).unwrap();
         println!(
             "STEAM id={} year={} genres={:?} dev={} mc={} hero={} shots={} trailer={}",

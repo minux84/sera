@@ -6,7 +6,7 @@
       name="viewport"
       content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"
     />
-    <title>Luma Aerials</title>
+    <title>Sera Aerials</title>
     <style>
       * {
         box-sizing: border-box;
@@ -125,7 +125,7 @@
         <button id="previous" title="Предыдущее видео">‹</button
         ><button id="pause" title="Пауза">Ⅱ</button
         ><button id="next" title="Следующее видео">›</button
-        ><button id="exit" title="Вернуться в Luma">Luma ↗</button>
+        ><button id="exit" title="Вернуться в Sera">Sera ↗</button>
       </div>
     </div>
     <div id="hint" aria-live="polite"></div>
@@ -172,7 +172,7 @@
           if (!item) return;
           changing = true;
           name.textContent = item.n;
-          detail.textContent = item.s + ' · Luma Aerials';
+          detail.textContent = item.s + ' · Sera Aerials';
           video.pause();
           video.src = item.u;
           video.load();
@@ -206,7 +206,7 @@
             const bridge = new PalmServiceBridge();
             bridge.call(
               'luna://com.webos.applicationManager/launch',
-              JSON.stringify({ id: 'com.denisefremov.luma' }),
+              JSON.stringify({ id: 'it.bytebuilder.sera' }),
             );
           } catch (e) {
             window.close();

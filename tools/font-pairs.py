@@ -1,4 +1,4 @@
-"""Offline static OFL font generation for Luma, retaining Latin and Cyrillic."""
+"""Offline static OFL font generation for Sera, retaining Latin and Cyrillic."""
 import json
 import sys
 from pathlib import Path

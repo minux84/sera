@@ -1,10 +1,10 @@
 {
-  "id": "com.denisefremov.luma.player",
+  "id": "it.bytebuilder.sera.player",
   "version": "0.0.11",
-  "vendor": "Luma",
+  "vendor": "Sera",
   "type": "web",
   "main": "index.html",
-  "title": "Luma Player",
+  "title": "Sera Player",
   "icon": "icon.png",
   "resolution": "1920x1080",
   "transparent": false,

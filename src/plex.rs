@@ -1,4 +1,4 @@
-//! Plex for Home stacks. Luma signs in with a plex.tv PIN: the TV shows a
+//! Plex for Home stacks. Sera signs in with a plex.tv PIN: the TV shows a
 //! four-letter code for plex.tv/link (or a QR with it filled in) and polls
 //! until the user approves it. Tokens are never logged.
 use crate::media::{Detail, Episode, PlayRequest};
@@ -14,11 +14,11 @@ use std::time::{Duration, Instant};
 
 const PLEX_TV: &str = "https://plex.tv";
 
-/// Saved sign-in: the plex.tv account and the media server Luma reads.
+/// Saved sign-in: the plex.tv account and the media server Sera reads.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(default)]
 pub struct PlexLink {
-    /// Random per-install id; plex.tv lists Luma as its own device.
+    /// Random per-install id; plex.tv lists Sera as its own device.
     pub client_id: String,
     pub account_token: String,
     pub user_name: String,
@@ -162,12 +162,12 @@ fn request<B>(
 ) -> ureq::RequestBuilder<B> {
     let builder = builder
         .header("Accept", "application/json")
-        .header("X-Plex-Product", "Luma")
+        .header("X-Plex-Product", "Sera")
         .header("X-Plex-Version", env!("CARGO_PKG_VERSION"))
         .header("X-Plex-Client-Identifier", client_id)
         .header("X-Plex-Platform", "webOS")
         .header("X-Plex-Device", "LG TV")
-        .header("X-Plex-Device-Name", "Luma");
+        .header("X-Plex-Device-Name", "Sera");
     if token.is_empty() {
         builder
     } else {
@@ -209,7 +209,7 @@ fn metadata(value: Option<Value>) -> Vec<Value> {
 fn auth_url(client_id: &str, code: &str) -> String {
     format!(
         "https://app.plex.tv/auth#?clientID={client_id}&code={code}\
-         &context%5Bdevice%5D%5Bproduct%5D=Luma"
+         &context%5Bdevice%5D%5Bproduct%5D=Sera"
     )
 }
 
@@ -734,7 +734,7 @@ fn hls_url(link: &PlexLink, key: &str, session: &str) -> String {
          &protocol=hls&fastSeek=1&directPlay=0&directStream=1&directStreamAudio=1\
          &videoQuality=100&maxVideoBitrate=120000&videoResolution=3840x2160\
          &session={session}&X-Plex-Session-Identifier={session}&X-Plex-Client-Identifier={}\
-         &X-Plex-Product=Luma&X-Plex-Platform=Chrome&X-Plex-Token={}",
+         &X-Plex-Product=Sera&X-Plex-Platform=Chrome&X-Plex-Token={}",
         link.server_uri, link.client_id, link.server_token
     )
 }

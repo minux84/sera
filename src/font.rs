@@ -4,8 +4,8 @@ use geometry::lyon_tessellation::{
     math::point,
     path::{Path, path::Builder},
 };
-use luma_vector_geometry::{self as geometry, Vertex};
 use owned_ttf_parser::{AsFaceRef, GlyphId, OutlineBuilder, OwnedFace};
+use sera_vector_geometry::{self as geometry, Vertex};
 
 pub struct Font {
     face: OwnedFace,

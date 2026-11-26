@@ -1,4 +1,4 @@
-// Luma player renders controls over the native webOS video element.
+// Sera player renders controls over the native webOS video element.
 // Signed media server stream URLs remain in memory, never logged.
 'use strict';
 
@@ -16,7 +16,7 @@ window.onerror = (message, source, line) => {
 
 const $ = (id) => document.getElementById(id);
 const video = $('video');
-const LUMA = 'com.denisefremov.luma';
+const SERA = 'it.bytebuilder.sera';
 const HIDE_MS = 4000;
 const SEEK_STEP = 10;
 const SEEK_SETTLE_MS = 450;
@@ -24,7 +24,7 @@ const MARK_EVERY_MS = 30000;
 const PAD = 88;
 const WIDE = 1744;
 
-let p = {}; // launch params from Luma
+let p = {}; // launch params from Sera
 let icons = {}; // name -> svg text
 let focus = 'bar'; // 'close' | 'bar' | 'row:N' | 'panelClose' | 'opt:KIND:N'
 let rowItems = []; // [{id, icon, label, trailing, act}]
@@ -524,7 +524,7 @@ function report(event, done) {
       `${r.base}/:/timeline?ratingKey=${r.item}&key=%2Flibrary%2Fmetadata%2F${r.item}&state=${state}&time=${ms}&duration=${total}&X-Plex-Token=${r.token}`,
     );
     x.setRequestHeader('X-Plex-Client-Identifier', r.deviceId);
-    x.setRequestHeader('X-Plex-Product', 'Luma');
+    x.setRequestHeader('X-Plex-Product', 'Sera');
     x.setRequestHeader('X-Plex-Session-Identifier', r.session);
     x.send();
     return;
@@ -538,7 +538,7 @@ function report(event, done) {
   x.setRequestHeader('Content-Type', 'application/json');
   x.setRequestHeader(
     'Authorization',
-    `MediaBrowser Client="Luma", Device="LG TV", DeviceId="${r.deviceId}", Version="${r.version || '1'}", Token="${r.token}"`,
+    `MediaBrowser Client="Sera", Device="LG TV", DeviceId="${r.deviceId}", Version="${r.version || '1'}", Token="${r.token}"`,
   );
   x.send(
     JSON.stringify({
@@ -590,13 +590,13 @@ function leave(_why) {
   if (leaving) return;
   leaving = true;
   video.pause();
-  // Luma reloads the card on return, so the watch time is saved first (1.5 s at most).
+  // Sera reloads the card on return, so the watch time is saved first (1.5 s at most).
   let gone = false;
   const go = () => {
     if (gone) return;
     gone = true;
     luna('luna://com.webos.applicationManager/launch', {
-      id: LUMA,
+      id: SERA,
       params: { playerClosed: true, id: p.id || 0 },
     });
     setTimeout(() => {

@@ -1,4 +1,4 @@
-//! Reusable on-LAN, phone-only input for Luma (Home Assistant, Moonlight).
+//! Reusable on-LAN, phone-only input for Sera (Home Assistant, Moonlight).
 //! No secrets in logs, preferences or URLs. QR links contain only a random nonce.
 use rand::{RngCore, rngs::OsRng};
 use std::{
@@ -89,7 +89,7 @@ fn escape_html(input: &str) -> String {
 }
 pub fn html_page(title: &str, body: &str) -> String {
     format!(
-        r#"<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>Luma</title><style>
+        r#"<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>Sera</title><style>
     :root{{color-scheme:dark}}body{{background:#101115;color:#f6f6f8;font:500 19px/1.5 system-ui,sans-serif;max-width:520px;margin:10vh auto;padding:28px}}
     h1{{font-size:30px;font-weight:750;letter-spacing:-.04em;margin:0 0 12px}}
     p{{color:#c2c3cd;margin:0 0 26px}}label{{display:block;margin-top:18px;font-size:18px;font-weight:650}}
@@ -487,7 +487,7 @@ pub fn serve_form<T, F>(
                 &mut stream,
                 &HttpResponse::new(
                     "200 OK",
-                    html_page("Luma Phone Link", "<p>Scan the QR on your TV.</p>"),
+                    html_page("Sera Phone Link", "<p>Scan the QR on your TV.</p>"),
                 ),
             );
         } else {

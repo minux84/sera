@@ -1756,7 +1756,7 @@ fn moonlight_hosts(out: &mut Scene, state: &State, assets: &Assets) {
         moonlight_steps(out, state);
     }
 }
-/// What has to happen before Luma can pair: Luma streams through the Moonlight
+/// What has to happen before Sera can pair: Sera streams through the Moonlight
 /// app, so that app must be installed, set up and paired with the PC first.
 fn moonlight_steps(out: &mut Scene, state: &State) {
     let apps = &state.inventory.apps;
@@ -1768,7 +1768,7 @@ fn moonlight_steps(out: &mut Scene, state: &State) {
             "1. Install Moonlight from Homebrew Channel"
         },
         "2. Open Moonlight, pair it with your PC and pick resolution, FPS and bitrate",
-        "3. Come back and pair Luma too. The PC asks for a second PIN",
+        "3. Come back and pair Sera too. The PC asks for a second PIN",
     ];
     let line = 44.;
     let x = RIGHT + S32;
@@ -1826,7 +1826,7 @@ fn moonlight_pin(out: &mut Scene, state: &State, assets: &Assets) {
         out,
         assets,
         &format!("Pair with {name}"),
-        "Luma pairs separately from the Moonlight app",
+        "Sera pairs separately from the Moonlight app",
     );
     out.settings_sidebar_range = start..out.draw.len();
 
@@ -1845,7 +1845,7 @@ fn moonlight_pin(out: &mut Scene, state: &State, assets: &Assets) {
         true,
     );
     let ip = host.map(|h| h.address.as_str()).unwrap_or("your PC");
-    let instructions = format!("Open https://{ip}:47990  ›  PIN, device name Luma");
+    let instructions = format!("Open https://{ip}:47990  ›  PIN, device name Sera");
     let instruction_y = block_y + 76. + S16;
     out.text(
         trunc(assets, &instructions, text(25., 500, 0.), WIDTH - 2. * S32),
@@ -2057,7 +2057,7 @@ fn jellyfin_link(out: &mut Scene, state: &State, assets: &Assets) {
             );
         }
         out.text(
-            "Scan the QR, or open Jellyfin › Profile › Quick Connect\nand enter this code. Luma signs in by itself.",
+            "Scan the QR, or open Jellyfin › Profile › Quick Connect\nand enter this code. Sera signs in by itself.",
             Rect::new(x, group_y + tile_h + S24, w, 76.),
             text(25., 500, 0.).leading(1.5),
             c(0xffffff, 0.78),
@@ -2291,7 +2291,7 @@ fn stack_config(out: &mut Scene, state: &State, assets: &Assets, i: usize) {
             if jellyfin {
                 ("Sign out", Some(account.as_str()), false)
             } else {
-                ("Unpair Luma", Some("Delete Luma credentials"), false)
+                ("Unpair Sera", Some("Delete Sera credentials"), false)
             },
             ("Remove", None, false),
         ];

@@ -1,5 +1,5 @@
 //! Sunshine/GameStream discovery, PIN pairing and cached PC games.
-//! Only Luma's own RSA identity is used. All network calls run off the UI thread.
+//! Only Sera's own RSA identity is used. All network calls run off the UI thread.
 use crate::stacks::StackItem;
 use aes::{
     Aes128,
@@ -71,13 +71,13 @@ pub struct Game {
     pub order: usize,
 }
 
-/// What Luma remembers about games itself; Apollo has no history or dates.
+/// What Sera remembers about games itself; Apollo has no history or dates.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct GameLibrary {
-    /// Newest first: (Apollo app id, unix seconds) of games started from Luma.
+    /// Newest first: (Apollo app id, unix seconds) of games started from Sera.
     pub played: Vec<(i64, u64)>,
-    /// When Luma first saw each game (0 = already there when history began).
+    /// When Sera first saw each game (0 = already there when history began).
     pub first_seen: std::collections::BTreeMap<i64, u64>,
     pub favorites: Vec<i64>,
 }
@@ -330,7 +330,7 @@ impl Service {
                                     if let Some(restored) = restored {
                                         log_phase(
                                             0,
-                                            "Apollo authorized saved Luma identity; no PIN",
+                                            "Apollo authorized saved Sera identity; no PIN",
                                         );
                                         return Ok(restored);
                                     }
@@ -343,7 +343,7 @@ impl Service {
                                 }));
                             let result = attempt.unwrap_or_else(|_| {
                                 log_phase(0, "pair worker panicked");
-                                Err("Pairing failed inside Luma. Try again.".into())
+                                Err("Pairing failed inside Sera. Try again.".into())
                             });
                             let was_cancelled = flag.load(Ordering::SeqCst);
                             {
@@ -719,10 +719,10 @@ fn identity() -> Result<MoonlightLink, String> {
         .to_string();
     let kp = rcgen::KeyPair::from_pem(&pem).map_err(|e| e.to_string())?;
     let mut params =
-        rcgen::CertificateParams::new(vec!["Luma".into()]).map_err(|e| e.to_string())?;
+        rcgen::CertificateParams::new(vec!["Sera".into()]).map_err(|e| e.to_string())?;
     params
         .distinguished_name
-        .push(rcgen::DnType::CommonName, "Luma");
+        .push(rcgen::DnType::CommonName, "Sera");
     let cert = params.self_signed(&kp).map_err(|e| e.to_string())?;
     Ok(MoonlightLink {
         client_cert_pem: cert.pem(),
@@ -959,7 +959,7 @@ fn https_inner(
     let cert = der(&link.client_cert_pem)?;
     let key = rustls_pemfile::private_key(&mut BufReader::new(link.client_key_pem.as_bytes()))
         .map_err(|e| e.to_string())?
-        .ok_or("Missing Luma RSA key")?;
+        .ok_or("Missing Sera RSA key")?;
     let observed = Arc::new(Mutex::new(None));
     let pinned = if legacy_recovery && link.server_cert_pem.is_empty() {
         Vec::new()
@@ -1064,7 +1064,7 @@ fn authenticated_serverinfo_paired(link: &MoonlightLink) -> Result<bool, String>
         || link.client_cert_pem.is_empty()
         || link.client_key_pem.is_empty()
     {
-        return Err("No pinned Sunshine certificate or Luma identity".into());
+        return Err("No pinned Sunshine certificate or Sera identity".into());
     }
     let payload = https(
         link,
@@ -1143,12 +1143,12 @@ fn recover_existing_pair(
 fn log_phase(stage: usize, message: &str) {
     // Only non-sensitive stage numbers, HTTP codes and field lengths belong here.
     // NEVER write keys, PIN, certificates, pairing query strings or XML values.
-    let root = if Path::new("/media/developer/com.denisefremov.luma").exists() {
-        PathBuf::from("/media/developer/com.denisefremov.luma")
+    let root = if Path::new("/media/developer/it.bytebuilder.sera").exists() {
+        PathBuf::from("/media/developer/it.bytebuilder.sera")
     } else {
         std::env::temp_dir()
     };
-    if let Ok(mut file) = crate::logs::append(root.join("luma-moonlight.log")) {
+    if let Ok(mut file) = crate::logs::append(root.join("sera-moonlight.log")) {
         let time = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
@@ -1343,7 +1343,7 @@ fn pair(
     let private = RsaPrivateKey::from_pkcs8_pem(&link.client_key_pem).map_err(|e| e.to_string())?;
     let mut signed = secret.clone();
     signed.extend_from_slice(&SigningKey::<Sha256>::new(private).sign(&secret).to_vec());
-    let _ = updates.send(Update::PairProgress("Step 4/5: authorizing Luma…".into()));
+    let _ = updates.send(Update::PairProgress("Step 4/5: authorizing Sera…".into()));
     phase(
         &link,
         4,
@@ -1451,7 +1451,7 @@ fn load_cached(root: &Path, uuid: &str) -> (Vec<StackItem>, Vec<Game>) {
 }
 fn fetch(link: &MoonlightLink, root: &Path) -> Result<(Vec<StackItem>, Vec<Game>), String> {
     if !link.paired {
-        return Err("Luma is not paired with Sunshine".into());
+        return Err("Sera is not paired with Sunshine".into());
     }
     let raw = https(
         link,
@@ -1550,7 +1550,7 @@ mod tests {
     }
     #[test]
     fn apollo_cover_becomes_a_small_two_by_three_jpeg() {
-        let dir = std::env::temp_dir().join("luma-poster-fit-test");
+        let dir = std::env::temp_dir().join("sera-poster-fit-test");
         let _ = std::fs::create_dir_all(&dir);
         let png = dir.join("cover.png");
         image::RgbImage::new(600, 800).save(&png).unwrap();
@@ -1591,7 +1591,7 @@ mod tests {
     #[ignore]
     fn live_beast_tls_handshake() {
         let mut link = identity().unwrap();
-        link.address = std::env::var("LUMA_BEAST").unwrap_or("192.168.1.140".into());
+        link.address = std::env::var("SERA_BEAST").unwrap_or("192.168.1.140".into());
         link.https_port = 47984;
         let result = https_inner(
             &link,
@@ -1677,7 +1677,7 @@ mod tests {
         assert_eq!(l.unique_id.len(), 16);
         assert!(!cert_signature(&l.client_cert_pem).unwrap().is_empty());
         let private = RsaPrivateKey::from_pkcs8_pem(&l.client_key_pem).unwrap();
-        let msg = b"Luma test challenge";
+        let msg = b"Sera test challenge";
         let signed = SigningKey::<Sha256>::new(private).sign(msg).to_vec();
         verify_secret(&l.client_cert_pem, msg, &signed).unwrap();
     }
@@ -1853,7 +1853,7 @@ mod tests {
     }
     #[test]
     fn live_existing_apollo_pair_without_pin() {
-        let Ok(path) = std::env::var("LUMA_TEST_EXISTING_IDENTITY") else {
+        let Ok(path) = std::env::var("SERA_TEST_EXISTING_IDENTITY") else {
             return;
         };
         let data = std::fs::read(path).unwrap();
@@ -1864,7 +1864,7 @@ mod tests {
     }
     #[test]
     fn live_pair_beast() {
-        let Ok(ip) = std::env::var("LUMA_TEST_LIVE_PAIR_IP") else {
+        let Ok(ip) = std::env::var("SERA_TEST_LIVE_PAIR_IP") else {
             return;
         };
         let host = probe(&ip).expect("BEAST Sunshine");
