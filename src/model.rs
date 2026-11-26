@@ -301,6 +301,8 @@ pub struct Preferences {
     /// Last playback position, keyed by media item ID; never stores URLs or tokens.
     pub playback_progress: BTreeMap<String, u64>,
     /// Play opens Sera's own player instead of the TV's (Settings › Player).
+    /// Luma saved the same choice as `luma_player`.
+    #[serde(alias = "luma_player")]
     pub sera_player: bool,
     /// Home widgets right of the headline (Settings › Widgets).
     pub widgets: crate::widgets::WidgetPrefs,

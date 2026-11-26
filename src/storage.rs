@@ -95,8 +95,8 @@ fn tv_path() -> Result<PathBuf, String> {
             continue;
         }
         if !path.exists() {
-            // Import JSON only from the old path in THIS installation, never
-            // browser storage or another app ID's preferences.
+            // Import JSON from the old path in THIS installation, or else from
+            // Luma, which Sera replaces. Never browser storage or any other app ID.
             match fs::read(&legacy) {
                 Ok(bytes) => {
                     let mut preferences: Preferences =
@@ -115,7 +115,9 @@ fn tv_path() -> Result<PathBuf, String> {
                         path.display()
                     );
                 }
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                    import_from_luma(&path, directory);
+                }
                 Err(error) => {
                     return Err(format!(
                         "Existing preferences {} could not be read: {error}",
@@ -139,6 +141,127 @@ fn tv_path() -> Result<PathBuf, String> {
         "No writable persistent TV storage found: {}",
         failures.join("; ")
     ))
+}
+
+/// The launcher Sera was forked from. Its settings are imported once, into a
+/// Sera that has none yet.
+pub const LUMA_APP_ID: &str = "com.denisefremov.luma";
+
+/// Files Luma kept beside its preferences that Sera reads under the same names.
+pub const LUMA_FILES: [&str; 4] = [
+    "preferences.json",
+    "preferences.weather.json",
+    "ha-auth.json",
+    "preferences.artwork",
+];
+
+/// First Sera start on a TV that had Luma: bring its settings over. Best
+/// effort: on any failure Sera simply starts with defaults, as before.
+#[cfg(all(feature = "webos", unix))]
+fn import_from_luma(path: &Path, directory: &Path) {
+    let id = LUMA_APP_ID;
+    let sources = [
+        PathBuf::from("/media/developer").join(id),
+        PathBuf::from("/media/developer/temp").join(id),
+        PathBuf::from("/media/internal").join(format!(".{id}")),
+    ];
+    // Stat the directory itself: Luma created it 0700 under its own user, so
+    // its files may not even be visible to Sera.
+    for source in sources
+        .iter()
+        .filter(|source| fs::symlink_metadata(source).is_ok_and(|m| m.is_dir()))
+    {
+        // Root (Homebrew Channel) can read Luma's private files and hand Sera
+        // a copy it owns; without root, read them directly where permitted.
+        let staging = directory.join(".luma-import");
+        let staged = crate::platform::root_copy(
+            source,
+            &staging,
+            &LUMA_FILES,
+            unsafe { libc::geteuid() },
+            unsafe { libc::getegid() },
+        )
+        .map_err(|error| eprintln!("Sera Luma import without root: {error}"))
+        .is_ok();
+        let result = import_luma(if staged { &staging } else { source }, path);
+        if staged && let Err(error) = fs::remove_dir_all(&staging) {
+            eprintln!(
+                "Sera Luma import: could not remove {}: {error}",
+                staging.display()
+            );
+        }
+        match result {
+            Ok(()) => {
+                eprintln!("Sera settings imported from Luma: {}", source.display());
+                return;
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => eprintln!("Sera Luma import from {}: {error}", source.display()),
+        }
+    }
+}
+
+/// Imports a Luma storage directory into a Sera that has no preferences yet:
+/// the preferences file (sanitized like any load), then best effort the
+/// weather cache, the Home Assistant sign-in and custom app artwork. Fails
+/// only when the preferences themselves cannot be imported.
+pub fn import_luma(source: &Path, destination: &Path) -> std::io::Result<()> {
+    use std::io::{Error, ErrorKind};
+    if destination.exists() {
+        return Err(Error::new(
+            ErrorKind::AlreadyExists,
+            "Sera already has preferences",
+        ));
+    }
+    let bytes = fs::read(source.join("preferences.json"))?;
+    let mut preferences: Preferences = serde_json::from_slice(&bytes)
+        .map_err(|e| Error::new(ErrorKind::InvalidData, format!("Luma preferences: {e}")))?;
+    migrate_selection(&bytes, &mut preferences);
+    preferences.sanitize();
+    save(destination, &preferences).map_err(Error::other)?;
+
+    let weather = crate::weather_service::cache_path(destination);
+    if !weather.exists()
+        && let Some(cache) =
+            crate::weather_service::load_cache(&source.join("preferences.weather.json"))
+        && let Err(error) = crate::weather_service::save_cache(&weather, &cache)
+    {
+        eprintln!("Sera Luma import, weather cache: {error}");
+    }
+    let auth = crate::smart_home::auth_path(destination);
+    if let Err(error) = crate::smart_home::import_auth(&source.join("ha-auth.json"), &auth) {
+        eprintln!("Sera Luma import, Home Assistant sign-in: {error}");
+    }
+    if let Err(error) = copy_artwork(
+        &source.join("preferences.artwork"),
+        &destination.with_extension("artwork"),
+    ) {
+        eprintln!("Sera Luma import, app artwork: {error}");
+    }
+    Ok(())
+}
+
+/// Copies regular files only (no symlinks, no subfolders) and never replaces
+/// artwork Sera already has.
+fn copy_artwork(from: &Path, to: &Path) -> std::io::Result<()> {
+    let entries = match fs::read_dir(from) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error),
+    };
+    fs::create_dir_all(to)?;
+    let mut failure = None;
+    for entry in entries {
+        let entry = entry?;
+        let target = to.join(entry.file_name());
+        if !entry.file_type()?.is_file() || target.exists() {
+            continue;
+        }
+        if let Err(error) = fs::copy(entry.path(), &target) {
+            failure = Some(error);
+        }
+    }
+    failure.map_or(Ok(()), Err)
 }
 
 pub fn load(path: &Path) -> Result<Preferences, String> {

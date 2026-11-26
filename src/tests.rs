@@ -271,6 +271,59 @@ fn preferences_round_trip_and_corrupt_data_is_not_silently_overwritten() {
 }
 
 #[test]
+fn luma_settings_are_imported_into_a_fresh_sera() {
+    let root = std::env::temp_dir().join(format!("sera-luma-import-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    let luma = root.join("com.denisefremov.luma");
+    let sera = root.join("it.bytebuilder.sera/preferences.json");
+    std::fs::create_dir_all(luma.join("preferences.artwork/nested")).unwrap();
+    std::fs::write(
+        luma.join("preferences.json"),
+        r#"{"background":"forest","luma_player":false}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        luma.join("ha-auth.json"),
+        r#"{"access_token":"t","refresh_token":"r","client_id":"c","expires_at":9}"#,
+    )
+    .unwrap();
+    std::fs::write(luma.join("preferences.artwork/a.png"), b"png").unwrap();
+
+    storage::import_luma(&luma, &sera).unwrap();
+    let imported = storage::load(&sera).unwrap();
+    assert_eq!(imported.background, "forest");
+    assert!(
+        !imported.sera_player,
+        "luma_player carries over as sera_player"
+    );
+    let auth = sera.with_file_name("ha-auth.json");
+    let saved: serde_json::Value = serde_json::from_slice(&std::fs::read(&auth).unwrap()).unwrap();
+    assert_eq!(saved["access_token"], "t");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = std::fs::metadata(&auth).unwrap().permissions().mode();
+        assert_eq!(mode & 0o077, 0, "the sign-in stays private");
+    }
+    let artwork = sera.with_extension("artwork");
+    assert_eq!(std::fs::read(artwork.join("a.png")).unwrap(), b"png");
+    assert!(!artwork.join("nested").exists());
+
+    // Never replace settings Sera already has.
+    std::fs::write(luma.join("preferences.json"), r#"{"background":"dunes"}"#).unwrap();
+    let again = storage::import_luma(&luma, &sera).unwrap_err();
+    assert_eq!(again.kind(), std::io::ErrorKind::AlreadyExists);
+    assert_eq!(storage::load(&sera).unwrap().background, "forest");
+
+    // Without Luma preferences nothing is created.
+    let empty = root.join("missing/preferences.json");
+    let missing = storage::import_luma(&root.join("none"), &empty).unwrap_err();
+    assert_eq!(missing.kind(), std::io::ErrorKind::NotFound);
+    assert!(!empty.exists());
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn home_clip_extends_to_screen_bottom_without_changing_other_pages() {
     let mut state = ready();
     for (page, expected_bottom, expected_left, expected_width) in [

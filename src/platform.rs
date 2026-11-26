@@ -249,6 +249,52 @@ fn root_inventory_read(uri: &str, field: &str) -> Result<Value, String> {
     })
 }
 
+/// As root (Homebrew Channel), copies the named entries of `source` that exist
+/// into a fresh `target`, owned by `uid:gid` so this app can read them. Used
+/// once, to import another app's private storage (see storage::import_luma).
+pub fn root_copy(
+    source: &std::path::Path,
+    target: &std::path::Path,
+    names: &[&str],
+    uid: u32,
+    gid: u32,
+) -> Result<(), String> {
+    let quote = |path: &std::path::Path| {
+        path.to_str()
+            .map(|value| format!("'{}'", value.replace('\'', "'\\''")))
+            .ok_or_else(|| format!("Unsupported path {}", path.display()))
+    };
+    let (from, to) = (quote(source)?, quote(target)?);
+    let copies = names
+        .iter()
+        .map(|name| {
+            let entry = quote(&source.join(name))?;
+            Ok(format!(
+                "if [ -e {entry} ]; then cp -R {entry} {to}/ || exit 1; fi; "
+            ))
+        })
+        .collect::<Result<String, String>>()?;
+    let command = format!(
+        "if [ \"$(id -u)\" != 0 ]; then echo noroot; exit 0; fi; [ -d {from} ] || exit 1; \
+         rm -rf {to} && mkdir -m 700 {to} || exit 1; {copies}\
+         chown -R {uid}:{gid} {to} && chmod -R u+rwX {to} && echo copied"
+    );
+    let envelope = call(
+        "luna://org.webosbrew.hbchannel.service/exec",
+        json!({"command": command}),
+    )?;
+    let stdout = envelope
+        .get("stdoutString")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    if stdout.lines().any(|line| line.trim() == "copied") {
+        Ok(())
+    } else {
+        let _ = std::fs::remove_dir_all(target);
+        Err(format!("Root copy failed: {}", output_excerpt(stdout)))
+    }
+}
+
 pub fn read_app_icons(source: &app_artwork::Source) -> Result<Vec<Vec<u8>>, String> {
     if !cfg!(feature = "webos") {
         return Err("Installed artwork is only read on TV builds".into());

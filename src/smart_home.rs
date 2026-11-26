@@ -656,6 +656,21 @@ fn read_auth(path: &std::path::Path) -> Option<Secrets> {
     }
     serde_json::from_slice(&std::fs::read(path).ok()?).ok()
 }
+/// Copies a sign-in saved by another installation (Luma) into `to`, checked and
+/// kept private. False when there was none or `to` already holds one.
+pub(crate) fn import_auth(from: &std::path::Path, to: &std::path::Path) -> Result<bool, String> {
+    if to.exists() {
+        return Ok(false);
+    }
+    let bytes = match std::fs::read(from) {
+        Ok(bytes) => bytes,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(e) => return Err(e.to_string()),
+    };
+    let secrets: Secrets = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
+    save_auth(to, &secrets)?;
+    Ok(true)
+}
 pub(crate) fn save_auth(path: &std::path::Path, secrets: &Secrets) -> Result<(), String> {
     #[cfg(unix)]
     {
