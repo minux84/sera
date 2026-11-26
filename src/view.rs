@@ -84,6 +84,23 @@ impl Assets {
     fn path(&self, path: impl AsRef<Path>) -> String {
         self.root.join(path).to_string_lossy().into_owned()
     }
+    /// Full-screen image of wallpaper `id`: its photo, or the draw path of a
+    /// procedural one (`live` = animated, otherwise its fixed frame).
+    pub(crate) fn wallpaper(&self, id: &str, live: bool) -> String {
+        if crate::procedural::is_procedural(id) {
+            crate::procedural::path(id, live)
+        } else {
+            self.path(format!("wallpapers/{id}.jpg"))
+        }
+    }
+    /// Gallery thumbnail of wallpaper `id`.
+    pub(crate) fn wallpaper_thumbnail(&self, id: &str) -> String {
+        if crate::procedural::is_procedural(id) {
+            crate::procedural::path(id, false)
+        } else {
+            self.path(format!("thumbnails/{id}.jpg"))
+        }
+    }
 
     /// Exact glyph metrics, matched to the renderer's live font selection.
     fn glyph_advance(&self, c: char, style: TextStyle) -> f32 {
@@ -668,23 +685,25 @@ pub fn scene_with_pill(
             c(0x04090f, 0.23 * (1. - clear)),
         );
     } else if let Some((previous, start)) = &state.previous_background {
+        let live_wallpaper = !state.preferences.reduced_motion;
         out.image(
-            assets.path(format!("wallpapers/{previous}.jpg")),
+            assets.wallpaper(previous, live_wallpaper),
             Rect::new(0., 0., 1920., 1080.),
             0.,
             false,
         );
         let alpha = (start.elapsed().as_secs_f32() / 0.4).min(1.);
         out.draw.push(Draw::TintedImage(
-            assets.path(format!("wallpapers/{}.jpg", state.preferences.background)),
+            assets.wallpaper(&state.preferences.background, live_wallpaper),
             Rect::new(0., 0., 1920., 1080.),
             0.,
             false,
             [1., 1., 1., alpha],
         ));
     } else {
+        let live_wallpaper = !state.preferences.reduced_motion;
         out.image(
-            assets.path(format!("wallpapers/{}.jpg", state.preferences.background)),
+            assets.wallpaper(&state.preferences.background, live_wallpaper),
             Rect::new(0., 0., 1920., 1080.),
             0.,
             false,
@@ -702,7 +721,10 @@ pub fn scene_with_pill(
         )
     } else {
         (
-            assets.path(format!("wallpapers/{}.jpg", state.preferences.background)),
+            assets.wallpaper(
+                &state.preferences.background,
+                !state.preferences.reduced_motion,
+            ),
             [dim, dim, dim, 1.],
         )
     });
@@ -2003,13 +2025,17 @@ fn plain_greeting(
 ) -> f32 {
     let wrap = widgets_view::phrase_width(state);
     let lines = assets.lines(&greeting, style, wrap).max(1);
-    let line_step = style.size
-        * assets.active_heading.get().scale()
-        * assets.heading_pct.get() as f32
-        / 100.
-        * style.line_height;
+    let line_step =
+        style.size * assets.active_heading.get().scale() * assets.heading_pct.get() as f32 / 100.
+            * style.line_height;
     let height = one_line + (lines - 1) as f32 * line_step;
-    out.text(greeting, Rect::new(84., top, wrap, height), style, WHITE, false);
+    out.text(
+        greeting,
+        Rect::new(84., top, wrap, height),
+        style,
+        WHITE,
+        false,
+    );
     // One line keeps the 110 px slot the Home layout was tuned for.
     top + 110. + (lines - 1) as f32 * line_step
 }
@@ -3266,12 +3292,7 @@ fn background_settings(out: &mut Scene, state: &State, assets: &Assets) {
                 183.,
             );
             out.shadow(rect, 15., 11., 3., 0.12);
-            out.image(
-                assets.path(format!("thumbnails/{id}.jpg")),
-                rect,
-                15.,
-                false,
-            );
+            out.image(assets.wallpaper_thumbnail(id), rect, 15., false);
             if state.preferences.background == *id {
                 out.border(rect.inset(-2.), 17., 2.7, c(0xffffff, 0.95));
                 let check = Rect::new(rect.x + rect.w - 36., rect.y + 12., 24., 24.);

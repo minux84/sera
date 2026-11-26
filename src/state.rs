@@ -237,6 +237,8 @@ pub enum SettingsLevel {
     Section,
     WallpaperType,
     WallpaperPhotos,
+    /// Settings › Wallpaper › Animated: the procedural gallery.
+    WallpaperAnimated,
     WallpaperVideos,
     WallpaperCategory(usize),
     HeadingFonts,
@@ -582,6 +584,8 @@ pub struct State {
     pub video_selection_version: Cell<u64>,
     pub video_selected_count_cache: Cell<usize>,
     pub photo_background_backup: String,
+    /// Animated wallpaper to return to from the Photo or Video type.
+    pub animated_background_backup: String,
     pub previous_background: Option<(String, Instant)>,
     pub panel_started: Option<Instant>,
     pub weather: weather::Weather,
@@ -639,6 +643,11 @@ impl State {
             home.selection_version = 1;
         }
         let video_gallery = preferences.background == "video";
+        let animated_backup = if crate::procedural::is_procedural(&preferences.background) {
+            preferences.background.clone()
+        } else {
+            crate::procedural::ANIMATED[0].id.into()
+        };
         let photo_backup = if video_gallery {
             "yosemite".into()
         } else {
@@ -762,6 +771,7 @@ impl State {
             video_selection_version: Cell::new(video_selection_version),
             video_selected_count_cache: Cell::new(video_selected_count_cache),
             photo_background_backup: photo_backup,
+            animated_background_backup: animated_backup,
             previous_background: None,
             panel_started: None,
             weather: weather::Weather::default(),
@@ -1743,10 +1753,9 @@ impl State {
                         .position(|&f| f == self.preferences.text_font)
                         .unwrap_or(0),
                 ),
-                SettingsLevel::WallpaperType => {
-                    Target::WallpaperTab(usize::from(self.preferences.background == "video"))
-                }
+                SettingsLevel::WallpaperType => Target::WallpaperTab(self.wallpaper_tab()),
                 SettingsLevel::WallpaperPhotos => Target::Background(0),
+                SettingsLevel::WallpaperAnimated => Target::Background(0),
                 SettingsLevel::StackAdd => Target::StackSource(0),
                 SettingsLevel::MoonlightHosts => Target::MoonlightHost(0),
                 SettingsLevel::MoonlightPin => Target::MoonlightCancelButton,
@@ -1822,6 +1831,17 @@ impl State {
 
     /// Remote focus is revealed after layout changes, including hide/reorder.
     /// Pointer paths deliberately do not call this method.
+    /// Settings › Wallpaper › Type: 0 photo, 1 video, 2 animated.
+    pub fn wallpaper_tab(&self) -> usize {
+        if self.preferences.background == "video" {
+            1
+        } else if crate::procedural::is_procedural(&self.preferences.background) {
+            2
+        } else {
+            0
+        }
+    }
+
     pub fn reveal_focus(&mut self, controls: &[Control]) -> bool {
         let (previous, previous_home) = (self.scroll_goal, self.home_scroll_goal);
         // Home stands still under the title card while it opens, shows and
@@ -1881,6 +1901,8 @@ impl State {
                                 | SettingsLevel::UiResolution
                                 | SettingsLevel::StackCollection(_)
                                 | SettingsLevel::StackShape(_)
+                                | SettingsLevel::WallpaperPhotos
+                                | SettingsLevel::WallpaperAnimated
                         )
                         || self.section == STACKS_SECTION
                         || self.section == SMARTHOME_SECTION)
@@ -1909,6 +1931,8 @@ impl State {
                                 | SettingsLevel::UiResolution
                                 | SettingsLevel::StackCollection(_)
                                 | SettingsLevel::StackShape(_)
+                                | SettingsLevel::WallpaperPhotos
+                                | SettingsLevel::WallpaperAnimated
                         )
                         || self.section == STACKS_SECTION
                         || self.section == SMARTHOME_SECTION)
@@ -3055,8 +3079,13 @@ impl State {
                 }
             }
             if let Target::Background(index) = self.focus {
+                let count = if self.settings_level == SettingsLevel::WallpaperAnimated {
+                    crate::procedural::ANIMATED.len()
+                } else {
+                    BACKGROUNDS.len()
+                };
                 match direction {
-                    Direction::Right if index + 1 < BACKGROUNDS.len() => {
+                    Direction::Right if index + 1 < count => {
                         self.focus(Target::Background(index + 1), controls);
                         return vec![];
                     }
@@ -4484,9 +4513,10 @@ impl State {
             Target::WallpaperMenu(index) => match index {
                 0 => self.settings_push(
                     SettingsLevel::WallpaperType,
-                    Target::WallpaperTab(usize::from(self.preferences.background == "video")),
+                    Target::WallpaperTab(self.wallpaper_tab()),
                 ),
                 1 => self.settings_push(SettingsLevel::WallpaperPhotos, Target::Background(0)),
+                3 => self.settings_push(SettingsLevel::WallpaperAnimated, Target::Background(0)),
                 2 => self.settings_push(SettingsLevel::WallpaperVideos, Target::VideoGroup(0)),
                 _ => {}
             },
@@ -4551,14 +4581,33 @@ impl State {
                 return vec![Effect::Save];
             }
             Target::WallpaperTab(tab) => {
-                let video = tab == 1;
-                if video && self.preferences.background != "video" {
-                    self.photo_background_backup = self.preferences.background.clone();
-                    self.preferences.background = "video".into();
-                } else if !video && self.preferences.background == "video" {
-                    self.preferences.background = self.photo_background_backup.clone();
+                let current = self.wallpaper_tab();
+                if tab != current {
+                    let background = self.preferences.background.clone();
+                    match current {
+                        0 => self.photo_background_backup = background,
+                        2 => self.animated_background_backup = background,
+                        _ => {}
+                    }
+                    self.preferences.background = match tab {
+                        1 => "video".into(),
+                        2 => self.animated_background_backup.clone(),
+                        // The non-video backup may be an animated wallpaper.
+                        _ if BACKGROUNDS
+                            .iter()
+                            .any(|(id, _)| *id == self.photo_background_backup) =>
+                        {
+                            self.photo_background_backup.clone()
+                        }
+                        _ => "yosemite".into(),
+                    };
+                    // Leaving the video type elsewhere restores the wallpaper
+                    // it replaced, photo or animated.
+                    if tab == 1 && current == 2 {
+                        self.photo_background_backup = self.animated_background_backup.clone();
+                    }
                 }
-                self.wallpaper_gallery_video = video;
+                self.wallpaper_gallery_video = tab == 1;
                 self.previous_background = None;
                 self.settings_pop(SettingsLevel::Section, Target::WallpaperMenu(0));
                 return vec![Effect::Save];
@@ -4639,11 +4688,20 @@ impl State {
                 return vec![Effect::Save];
             }
             Target::Background(index) => {
-                let selected = if let Some((value, _)) = BACKGROUNDS.get(index) {
+                let animated = self.settings_level == SettingsLevel::WallpaperAnimated;
+                let selected = if animated {
+                    match crate::procedural::ANIMATED.get(index) {
+                        Some(wallpaper) => wallpaper.id,
+                        None => return vec![],
+                    }
+                } else if let Some((value, _)) = BACKGROUNDS.get(index) {
                     *value
                 } else {
                     return vec![];
                 };
+                if animated {
+                    self.animated_background_backup = selected.into();
+                }
                 if !self.preferences.reduced_motion
                     && self.preferences.background != selected
                     && self.preferences.background != "video"
@@ -4655,7 +4713,9 @@ impl State {
                     self.previous_background = None;
                 }
                 self.preferences.background = selected.into();
-                self.photo_background_backup = selected.into();
+                if !animated {
+                    self.photo_background_backup = selected.into();
+                }
                 return vec![Effect::Save];
             }
             Target::VideoNext => {
@@ -4925,6 +4985,9 @@ impl State {
                 }
                 SettingsLevel::WallpaperPhotos => {
                     self.settings_pop(SettingsLevel::Section, Target::WallpaperMenu(1))
+                }
+                SettingsLevel::WallpaperAnimated => {
+                    self.settings_pop(SettingsLevel::Section, Target::WallpaperMenu(3))
                 }
                 SettingsLevel::WallpaperType => {
                     self.settings_pop(SettingsLevel::Section, Target::WallpaperMenu(0))

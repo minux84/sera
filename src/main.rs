@@ -21,6 +21,7 @@ mod platform;
 mod player;
 mod player_backend;
 mod plex;
+mod procedural;
 mod raster;
 mod renderer;
 #[path = "scroll-preview.rs"]
@@ -2462,6 +2463,7 @@ fn run() -> Result<(), String> {
     let mut pill_width = initial_nav.items[0].w;
     let mut last_frame = Instant::now();
     let mut last_sky_frame = Instant::now();
+    let mut last_aurora_frame = Instant::now();
     let mut last_art_frame = Instant::now();
     let mut last_minute = None;
     let mut frame = 0u64;
@@ -3724,6 +3726,15 @@ fn run() -> Result<(), String> {
             && !state.preferences.reduced_motion;
         if art_running && last_art_frame.elapsed() >= Duration::from_millis(15) {
             last_art_frame = Instant::now();
+            state.dirty = true;
+        }
+        // Aurora wallpapers drift at up to 30fps on any visible page; like the
+        // sky, they are decoration and never trigger the resolution downgrade.
+        let aurora_running = visible
+            && procedural::is_procedural(&state.preferences.background)
+            && !state.preferences.reduced_motion;
+        if aurora_running && last_aurora_frame.elapsed() >= Duration::from_millis(33) {
+            last_aurora_frame = Instant::now();
             state.dirty = true;
         }
         if sky_running && last_sky_frame.elapsed() >= Duration::from_millis(33) {

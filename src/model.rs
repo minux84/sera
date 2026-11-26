@@ -461,6 +461,7 @@ impl Preferences {
         }
         if (self.background == "video" && !VIDEO_WALLPAPER_SUPPORTED)
             || (self.background != "video"
+                && !crate::procedural::is_procedural(&self.background)
                 && !BACKGROUNDS.iter().any(|(id, _)| *id == self.background))
         {
             self.background = "dunes".into();

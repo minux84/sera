@@ -214,6 +214,21 @@ impl Drop for Texture {
     }
 }
 
+/// One procedural wallpaper render target.
+struct Procedural {
+    fbo: GLuint,
+    texture: Texture,
+    /// Renderer frame last painted; `None` until the first paint.
+    painted: Option<u64>,
+}
+impl Drop for Procedural {
+    fn drop(&mut self) {
+        unsafe {
+            gl::DeleteFramebuffers(1, &self.fbo);
+        }
+    }
+}
+
 struct Glyph {
     geometry: Vec<luma_vector_geometry::Vertex>,
     frame: u64,
@@ -368,6 +383,15 @@ pub struct Renderer {
     program: GLuint,
     vector_program: GLuint,
     text_program: GLuint,
+    /// Aurora wallpapers: shader (0 if it failed to build), its quad, one
+    /// 480x270 render target per draw path, and the animation clock.
+    procedural_programs: [GLuint; crate::procedural::Style::ALL.len()],
+    procedural_buffer: GLuint,
+    /// 64x64 random RGBA, sampled per cell (snow): exact in mediump.
+    procedural_noise: Texture,
+    procedural: HashMap<String, Procedural>,
+    procedural_clock: f64,
+    procedural_last: Option<Instant>,
     buffer: GLuint,
     vao: GLuint,
     white: Texture,
@@ -471,8 +495,8 @@ impl Renderer {
             }
         };
         let text_program = match link(
-            &(vertex_prefix + include_str!("shaders/text.vert")),
-            &(fragment_prefix + include_str!("shaders/vector.frag")),
+            &(vertex_prefix.clone() + include_str!("shaders/text.vert")),
+            &(fragment_prefix.clone() + include_str!("shaders/vector.frag")),
             &[c"a_position", c"a_offset", c"a_origin", c"a_coverage"],
         ) {
             Ok(program) => program,
@@ -484,9 +508,33 @@ impl Renderer {
                 return Err(error);
             }
         };
+        // Optional: a driver that rejects one only loses that animated style.
+        let procedural_programs = crate::procedural::Style::ALL.map(|style| {
+            link(
+                &(vertex_prefix.clone() + include_str!("shaders/procedural/quad.vert")),
+                &(fragment_prefix.clone()
+                    + include_str!("shaders/procedural/common.frag")
+                    + style.shader()),
+                &[c"a_position"],
+            )
+            .unwrap_or_else(|error| {
+                eprintln!("Animated wallpaper shader {style:?}: {error}");
+                0
+            })
+        });
         let mut buffer = 0;
+        let mut procedural_buffer = 0;
         let mut vao = 0;
         unsafe {
+            gl::GenBuffers(1, &mut procedural_buffer);
+            gl::BindBuffer(gl::ARRAY_BUFFER, procedural_buffer);
+            let strip: [f32; 8] = [-1., -1., 1., -1., -1., 1., 1., 1.];
+            gl::BufferData(
+                gl::ARRAY_BUFFER,
+                size_of_val(&strip) as isize,
+                strip.as_ptr().cast(),
+                gl::STATIC_DRAW,
+            );
             if !gles {
                 gl::GenVertexArrays(1, &mut vao);
                 gl::BindVertexArray(vao);
@@ -509,6 +557,12 @@ impl Renderer {
             program,
             vector_program,
             text_program,
+            procedural_programs,
+            procedural_buffer,
+            procedural_noise: noise_texture(),
+            procedural: HashMap::new(),
+            procedural_clock: 0.,
+            procedural_last: None,
             buffer,
             vao,
             white,
@@ -1178,6 +1232,13 @@ impl Renderer {
             self.image(source, rect, radius, contain, tint);
             return;
         }
+        if path.starts_with(crate::procedural::PREFIX) {
+            match self.procedural_texture(path) {
+                Some(id) => self.quad(rect, [0., 0., 1., 1.], radius, 0., tint, id),
+                None => self.stats.missing_images += 1,
+            }
+            return;
+        }
         if path.ends_with(".lvec") {
             self.vector_image(path, rect, contain, tint);
             return;
@@ -1421,6 +1482,24 @@ impl Renderer {
     /// Frosted glass under a plate: the full-screen image `source`, blurred
     /// once at 240x135 and stretched back, shown only inside `rect`.
     fn frost(&mut self, source: &str, rect: Rect, radius: f32, tint: Color, fill: Option<Color>) {
+        let uv = [
+            rect.x / 1920.,
+            rect.y / 1080.,
+            (rect.x + rect.w) / 1920.,
+            (rect.y + rect.h) / 1080.,
+        ];
+        // An animated wallpaper is already blur-smooth at its low resolution: its live
+        // texture is the frost, so plates follow the motion behind them.
+        if source.starts_with(crate::procedural::PREFIX) {
+            let Some(id) = self.procedural_texture(source) else {
+                return;
+            };
+            self.quad(rect, uv, radius, 0., tint, id);
+            if let Some(fill) = fill {
+                self.quad(rect, [0., 0., 1., 1.], radius, 0., fill, self.white.id);
+            }
+            return;
+        }
         let key = format!("{source}#frost");
         if !self.textures.contains_key(&key) && self.stills.pending.contains(source) {
             self.upload_stills(Some(source));
@@ -1446,12 +1525,6 @@ impl Renderer {
         };
         plain.frame = frame;
         let plain_id = plain.id;
-        let uv = [
-            rect.x / 1920.,
-            rect.y / 1080.,
-            (rect.x + rect.w) / 1920.,
-            (rect.y + rect.h) / 1080.,
-        ];
         let Some(fill) = fill else {
             self.quad(rect, uv, radius, 0., tint, plain_id);
             return;
@@ -1577,6 +1650,121 @@ impl Renderer {
             tint,
             id,
         );
+    }
+
+    /// The texture of a `procedural:` draw path, painted at most once per
+    /// renderer frame (a still: once ever). Runs while commands are being
+    /// built, before the screen pass, and restores the bound framebuffer.
+    fn procedural_texture(&mut self, path: &str) -> Option<GLuint> {
+        let (wallpaper, live) = crate::procedural::parse(path)?;
+        let program = self.procedural_programs[wallpaper.style.index()];
+        if program == 0 {
+            return None;
+        }
+        let palette = &wallpaper.palette;
+        let (width, height) = wallpaper.style.size();
+        let frame = self.frame;
+        if !self.procedural.contains_key(path) {
+            let texture = texture(width as u32, height as u32, &[]);
+            let mut fbo = 0;
+            let complete = unsafe {
+                let mut previous = 0;
+                gl::GetIntegerv(gl::FRAMEBUFFER_BINDING, &mut previous);
+                gl::GenFramebuffers(1, &mut fbo);
+                gl::BindFramebuffer(gl::FRAMEBUFFER, fbo);
+                gl::FramebufferTexture2D(
+                    gl::FRAMEBUFFER,
+                    gl::COLOR_ATTACHMENT0,
+                    gl::TEXTURE_2D,
+                    texture.id,
+                    0,
+                );
+                let status = gl::CheckFramebufferStatus(gl::FRAMEBUFFER);
+                gl::BindFramebuffer(gl::FRAMEBUFFER, previous as GLuint);
+                status == gl::FRAMEBUFFER_COMPLETE
+            };
+            if !complete {
+                eprintln!("Animated wallpaper: incomplete framebuffer");
+                unsafe { gl::DeleteFramebuffers(1, &fbo) };
+                self.procedural_programs = [0; crate::procedural::Style::ALL.len()];
+                return None;
+            }
+            self.procedural.insert(
+                path.into(),
+                Procedural {
+                    fbo,
+                    texture,
+                    painted: None,
+                },
+            );
+        }
+        let stale = {
+            let target = &self.procedural[path];
+            match target.painted {
+                None => true,
+                Some(at) => live && at != frame,
+            }
+        };
+        if stale {
+            let seconds = live.then(|| {
+                // The clock only runs while live frames are drawn (steps are
+                // capped), so the wallpaper resumes where it paused.
+                let now = Instant::now();
+                if let Some(last) = self.procedural_last {
+                    self.procedural_clock += now.duration_since(last).as_secs_f64().min(0.1);
+                }
+                self.procedural_last = Some(now);
+                self.procedural_clock
+            });
+            let shot = crate::procedural::frame(wallpaper, seconds);
+            let fbo = self.procedural[path].fbo;
+            unsafe {
+                let mut previous = 0;
+                let mut viewport = [0; 4];
+                gl::GetIntegerv(gl::FRAMEBUFFER_BINDING, &mut previous);
+                gl::GetIntegerv(gl::VIEWPORT, viewport.as_mut_ptr());
+                gl::BindFramebuffer(gl::FRAMEBUFFER, fbo);
+                gl::Viewport(0, 0, width, height);
+                gl::Disable(gl::BLEND);
+                gl::Disable(gl::SCISSOR_TEST);
+                gl::UseProgram(program);
+                let at = |name: &CStr| gl::GetUniformLocation(program, name.as_ptr());
+                gl::Uniform4fv(
+                    at(c"u_points[0]"),
+                    crate::procedural::POINTS as i32,
+                    shot.points.as_ptr().cast(),
+                );
+                gl::Uniform3fv(
+                    at(c"u_colors[0]"),
+                    palette.colors.len() as i32,
+                    palette.colors.as_ptr().cast(),
+                );
+                gl::Uniform3fv(at(c"u_base"), 1, palette.base.as_ptr());
+                gl::Uniform3fv(at(c"u_accent"), 1, palette.accent.as_ptr());
+                gl::Uniform4fv(at(c"u_phase"), 1, shot.phase.as_ptr());
+                gl::Uniform4fv(at(c"u_params"), 1, wallpaper.params.as_ptr());
+                gl::Uniform1i(at(c"u_noise"), 0);
+                gl::ActiveTexture(gl::TEXTURE0);
+                gl::BindTexture(gl::TEXTURE_2D, self.procedural_noise.id);
+                if self.vao != 0 {
+                    gl::BindVertexArray(self.vao);
+                }
+                gl::BindBuffer(gl::ARRAY_BUFFER, self.procedural_buffer);
+                for index in 1..5 {
+                    gl::DisableVertexAttribArray(index);
+                }
+                gl::EnableVertexAttribArray(0);
+                gl::VertexAttribPointer(0, 2, gl::FLOAT, gl::FALSE, 8, std::ptr::null());
+                gl::DrawArrays(gl::TRIANGLE_STRIP, 0, 4);
+                gl::Enable(gl::BLEND);
+                gl::BindFramebuffer(gl::FRAMEBUFFER, previous as GLuint);
+                gl::Viewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+            }
+        }
+        let target = self.procedural.get_mut(path)?;
+        target.painted = Some(frame);
+        target.texture.frame = frame;
+        Some(target.texture.id)
     }
 
     /// Upload one hardware-decoded RGB frame into a reused GPU texture, on the GL thread.
@@ -2236,6 +2424,11 @@ impl Renderer {
                 }
             }
         }
+        // Gallery stills and old wallpapers free their render targets
+        // about ten seconds after they were last shown.
+        let frame = self.frame;
+        self.procedural
+            .retain(|_, t| t.painted.is_some_and(|at| frame.saturating_sub(at) < 600));
         self.trim_text_geometry();
         self.stats.vector_meshes = self.vectors.values().flatten().count();
         self.stats.vector_bytes = self.vectors.values().flatten().map(|mesh| mesh.bytes).sum();
@@ -2765,6 +2958,12 @@ impl Drop for Renderer {
                 gl::DeleteTextures(1, &self.effects_texture);
             }
             gl::DeleteBuffers(1, &self.buffer);
+            gl::DeleteBuffers(1, &self.procedural_buffer);
+            for program in self.procedural_programs {
+                if program != 0 {
+                    gl::DeleteProgram(program);
+                }
+            }
             gl::DeleteProgram(self.program);
             gl::DeleteProgram(self.vector_program);
             gl::DeleteProgram(self.text_program);
@@ -2790,6 +2989,27 @@ fn frost_pixels(image: &image::DynamicImage) -> image::RgbaImage {
         }
     }
     blurred
+}
+
+/// Deterministic 64x64 random texture with nearest sampling.
+fn noise_texture() -> Texture {
+    let mut state = 0x9e37_79b9_u32;
+    let pixels: Vec<u8> = (0..64 * 64 * 4)
+        .map(|_| {
+            // xorshift32: fixed seed, so every frame and device agree.
+            state ^= state << 13;
+            state ^= state >> 17;
+            state ^= state << 5;
+            (state >> 24) as u8
+        })
+        .collect();
+    let noise = texture(64, 64, &pixels);
+    unsafe {
+        gl::BindTexture(gl::TEXTURE_2D, noise.id);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::NEAREST as i32);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as i32);
+    }
+    noise
 }
 
 fn texture(width: u32, height: u32, pixels: &[u8]) -> Texture {

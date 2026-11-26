@@ -524,11 +524,7 @@ fn root(out: &mut Scene, state: &State, assets: &Assets) {
     };
     let values = [
         None,
-        Some(if state.preferences.background == "video" {
-            "Video"
-        } else {
-            "Photo"
-        }),
+        Some(["Photo", "Video", "Animated"][state.wallpaper_tab()]),
         Some(on_home.as_str()),
         None,
         None,
@@ -574,6 +570,10 @@ fn root(out: &mut Scene, state: &State, assets: &Assets) {
 fn wallpaper(out: &mut Scene, state: &State, assets: &Assets) {
     let h = 640.;
     panels(out, h);
+    if state.preferences.background != "video" {
+        still_wallpaper(out, state, assets);
+        return;
+    }
     let selected = crate::video_catalog::selected(&state.preferences.video_excluded);
     let items = [
         (
@@ -682,6 +682,68 @@ fn wallpaper(out: &mut Scene, state: &State, assets: &Assets) {
                 LEFT_W - S48,
                 38.,
             ),
+            text(25., 500, 0.),
+            c(0xffffff, 0.68),
+            false,
+        );
+    }
+    out.settings_sidebar_range = preview_start..out.draw.len();
+}
+/// Wallpaper menu while a photo or animated wallpaper is in use: the type,
+/// its gallery, and a preview of the current one.
+fn still_wallpaper(out: &mut Scene, state: &State, assets: &Assets) {
+    let id = &state.preferences.background;
+    let name = state.preferences.language.wallpaper(id).to_owned();
+    let animated = crate::procedural::is_procedural(id);
+    let (kind, gallery, menu) = if animated {
+        ("Animated", "Animations", 3)
+    } else {
+        ("Photo", "Photos", 1)
+    };
+    for (i, (target, label, value)) in [
+        (Target::WallpaperMenu(0), "Type", kind.to_owned()),
+        (Target::WallpaperMenu(menu), gallery, name.clone()),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        cell(
+            out,
+            state,
+            assets,
+            target,
+            list_cell(i),
+            CellContent {
+                name: label,
+                value: Some(&value),
+                desc: None,
+                chevron: true,
+                checked: false,
+                partial: false,
+            },
+        );
+    }
+    let preview_start = out.draw.len();
+    let w = LEFT_W - S48;
+    let h = w * 9. / 16.;
+    let y = TOP + S24 + BACK_SIZE + S16;
+    out.image(
+        assets.wallpaper(id, !state.preferences.reduced_motion),
+        Rect::new(LEFT + S24, y, w, h),
+        MEDIA_RADIUS,
+        false,
+    );
+    out.text(
+        name,
+        Rect::new(LEFT + S24, y + h + S24, w, 48.),
+        text(31., 600, 0.),
+        WHITE,
+        false,
+    );
+    if animated {
+        out.text(
+            "Generated live on the TV",
+            Rect::new(LEFT + S24, y + h + S24 + S48, w, 38.),
             text(25., 500, 0.),
             c(0xffffff, 0.68),
             false,
@@ -1345,14 +1407,14 @@ fn appearance(out: &mut Scene, state: &State, assets: &Assets) {
         357.75,
     );
     out.image(
-        assets.path(format!(
-            "wallpapers/{}.jpg",
+        assets.wallpaper(
             if state.preferences.background == "video" {
                 "dunes"
             } else {
                 &state.preferences.background
-            }
-        )),
+            },
+            !state.preferences.reduced_motion,
+        ),
         p,
         18.,
         false,
@@ -2494,7 +2556,7 @@ pub(super) fn render(out: &mut Scene, state: &State, assets: &Assets) {
                 PREVIEW_MIN,
             );
             out.settings_sidebar_range = preview_start..out.draw.len();
-            for (i, name) in ["Photo", "Video"].into_iter().enumerate() {
+            for (i, name) in ["Photo", "Video", "Animated"].into_iter().enumerate() {
                 cell(
                     out,
                     state,
@@ -2506,24 +2568,36 @@ pub(super) fn render(out: &mut Scene, state: &State, assets: &Assets) {
                         value: None,
                         desc: None,
                         chevron: false,
-                        checked: (state.preferences.background == "video") == (i == 1),
+                        checked: state.wallpaper_tab() == i,
                         partial: false,
                     },
                 );
             }
         }
-        SettingsLevel::WallpaperPhotos => {
+        SettingsLevel::WallpaperPhotos | SettingsLevel::WallpaperAnimated => {
             glass(out, Rect::new(LEFT, TOP, 1920. - 2. * EDGE, MAX_HEIGHT));
-            for (i, (id, _)) in BACKGROUNDS.iter().enumerate() {
+            let ids: Vec<&str> = if state.settings_level == SettingsLevel::WallpaperAnimated {
+                crate::procedural::ANIMATED.iter().map(|w| w.id).collect()
+            } else {
+                BACKGROUNDS.iter().map(|(id, _)| *id).collect()
+            };
+            // Rows scroll under the glass, never over the clock and tabs.
+            out.draw.push(Draw::Clip(Some(Rect::new(
+                LEFT,
+                TOP + S8,
+                1920. - 2. * EDGE,
+                MAX_HEIGHT - 2. * S8,
+            ))));
+            for (i, id) in ids.into_iter().enumerate() {
                 let x = LEFT + S24 + (i % 4) as f32 * (408. + S16);
                 let y = TOP + S48 + S64 + (i / 4) as f32 * (230. + S48) - state.scroll;
                 let r = Rect::new(x, y, 408., 230.);
-                out.image(
-                    assets.path(format!("thumbnails/{id}.jpg")),
-                    r,
-                    MEDIA_RADIUS,
-                    false,
-                );
+                out.image(assets.wallpaper_thumbnail(id), r, MEDIA_RADIUS, false);
+                if state.preferences.background == id {
+                    let check = Rect::new(r.x + r.w - 44., r.y + 14., 30., 30.);
+                    out.shape(check, 15., WHITE);
+                    out.icon(assets, "check", check.inset(5.), c(0x292929, 1.));
+                }
                 out.text(
                     state.preferences.language.wallpaper(id),
                     Rect::new(x, y + 230. + S8, 408., 45.),
@@ -2540,6 +2614,7 @@ pub(super) fn render(out: &mut Scene, state: &State, assets: &Assets) {
                     true,
                 );
             }
+            out.draw.push(Draw::Clip(None));
         }
         _ => {}
     }

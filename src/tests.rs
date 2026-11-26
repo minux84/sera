@@ -2357,6 +2357,8 @@ fn settings_v2_back_does_not_cover_wallpaper_thumbnails_or_category_count() {
     use crate::state::SettingsLevel;
     let mut state = ready();
     state.preferences.reduced_motion = true;
+    // The clip thumbnails belong to the menu of the video wallpaper.
+    state.preferences.background = "video".into();
     state.open_settings();
     state.section = 1;
     state.settings_level = SettingsLevel::Section;
@@ -3483,4 +3485,75 @@ fn unsupported_saved_media_source_is_ignored_without_losing_other_settings() {
     assert_eq!(prefs.stacks[0].source, "jellyfin");
     assert_eq!(prefs.stacks[0].collection, "recent");
     assert!(prefs.luma_player);
+}
+
+#[test]
+fn animated_wallpaper_menu_reaches_its_gallery_and_draws_live() {
+    use crate::state::SettingsLevel;
+    let mut state = ready();
+    state.preferences.background = "aurora".into();
+    state.open_settings();
+    state.section = 1;
+    state.settings_level = SettingsLevel::Section;
+    let frame = scene(&state);
+    assert!(
+        frame
+            .controls
+            .iter()
+            .any(|c| c.target == Target::WallpaperMenu(3))
+    );
+    // Live wallpaper path, no JPEG lookup.
+    assert!(frame.draw.iter().any(|d| matches!(
+        d,
+        crate::renderer::Draw::Image(path, ..) if path == "procedural:aurora"
+    )));
+    state.preferences.reduced_motion = true;
+    let frame = scene(&state);
+    assert!(frame.draw.iter().any(|d| matches!(
+        d,
+        crate::renderer::Draw::Image(path, ..) if path == "procedural:aurora@still"
+    )));
+}
+
+#[test]
+fn wallpaper_type_tabs_remember_photo_and_animated_choices() {
+    use crate::state::SettingsLevel;
+    let mut state = ready();
+    state.preferences.background = "forest".into();
+    state.open_settings();
+    state.section = 1;
+    state.settings_level = SettingsLevel::WallpaperType;
+    state.focus = Target::WallpaperTab(2);
+    state.activate();
+    assert_eq!(
+        state.preferences.background,
+        crate::procedural::ANIMATED[0].id
+    );
+    assert_eq!(state.wallpaper_tab(), 2);
+    // Pick another animation from its own gallery.
+    state.focus = Target::WallpaperMenu(3);
+    state.activate();
+    assert_eq!(state.settings_level, SettingsLevel::WallpaperAnimated);
+    state.focus = Target::Background(5);
+    state.activate();
+    let picked = crate::procedural::ANIMATED[5].id;
+    assert_eq!(state.preferences.background, picked);
+    // Photo restores the photo, Animated the animation.
+    state.settings_level = SettingsLevel::WallpaperType;
+    state.focus = Target::WallpaperTab(0);
+    state.activate();
+    assert_eq!(state.preferences.background, "forest");
+    state.settings_level = SettingsLevel::WallpaperType;
+    state.focus = Target::WallpaperTab(2);
+    state.activate();
+    assert_eq!(state.preferences.background, picked);
+    // Video and back returns to the animation it replaced.
+    state.settings_level = SettingsLevel::WallpaperType;
+    state.focus = Target::WallpaperTab(1);
+    state.activate();
+    assert_eq!(state.preferences.background, "video");
+    state.settings_level = SettingsLevel::WallpaperType;
+    state.focus = Target::WallpaperTab(2);
+    state.activate();
+    assert_eq!(state.preferences.background, picked);
 }

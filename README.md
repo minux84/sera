@@ -18,6 +18,7 @@ Free and open source (MIT). Fork it, change it, ship it.
 
 - Favorite apps row and "stacks": rows of content from Jellyfin, Moonlight and more, each capped at 20 cards with a **View Library** page behind it.
 - Live video wallpapers: Apple and Amazon aerials, played in hardware. Pick whole collections or single clips.
+- Animated wallpapers generated live on the GPU: aurora, waves, plasma, lava lamp, silk, bokeh and Christmas snowfall.
 - Frosted-glass UI with one accent gradient, adjustable colors, heading and text fonts, and UI resolution (Auto / 4K / 1440p / 1080p).
 - A headline that comments on the weather, plus a clock and date.
 

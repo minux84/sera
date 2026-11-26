@@ -923,6 +923,139 @@
     "zh": "优胜美地",
     "pt": "Yosemite"
   },
+  "Aurora": {
+    "en": "Aurora",
+    "de": "Aurora",
+    "es": "Aurora",
+    "zh": "极光",
+    "pt": "Aurora"
+  },
+  "Ember": {
+    "en": "Ember",
+    "de": "Glut",
+    "es": "Brasa",
+    "zh": "余烬",
+    "pt": "Brasa"
+  },
+  "Lagoon": {
+    "en": "Lagoon",
+    "de": "Lagune",
+    "es": "Laguna",
+    "zh": "泻湖",
+    "pt": "Lagoa"
+  },
+  "Dusk waves": {
+    "en": "Dusk waves",
+    "de": "Abendwellen",
+    "es": "Olas al atardecer",
+    "zh": "暮色波浪",
+    "pt": "Ondas ao entardecer"
+  },
+  "Ocean waves": {
+    "en": "Ocean waves",
+    "de": "Meereswellen",
+    "es": "Olas del océano",
+    "zh": "海浪",
+    "pt": "Ondas do oceano"
+  },
+  "Neon plasma": {
+    "en": "Neon plasma",
+    "de": "Neonplasma",
+    "es": "Plasma neón",
+    "zh": "霓虹等离子",
+    "pt": "Plasma neon"
+  },
+  "Pastel plasma": {
+    "en": "Pastel plasma",
+    "de": "Pastellplasma",
+    "es": "Plasma pastel",
+    "zh": "柔彩等离子",
+    "pt": "Plasma pastel"
+  },
+  "Lava lamp": {
+    "en": "Lava lamp",
+    "de": "Lavalampe",
+    "es": "Lámpara de lava",
+    "zh": "熔岩灯",
+    "pt": "Lâmpada de lava"
+  },
+  "Mint lamp": {
+    "en": "Mint lamp",
+    "de": "Minzlampe",
+    "es": "Lámpara menta",
+    "zh": "薄荷灯",
+    "pt": "Lâmpada menta"
+  },
+  "Silk": {
+    "en": "Silk",
+    "de": "Seide",
+    "es": "Seda",
+    "zh": "丝绸",
+    "pt": "Seda"
+  },
+  "Rose silk": {
+    "en": "Rose silk",
+    "de": "Roséseide",
+    "es": "Seda rosa",
+    "zh": "玫瑰丝绸",
+    "pt": "Seda rosa"
+  },
+  "City lights": {
+    "en": "City lights",
+    "de": "Stadtlichter",
+    "es": "Luces de ciudad",
+    "zh": "城市灯光",
+    "pt": "Luzes da cidade"
+  },
+  "Blue hour": {
+    "en": "Blue hour",
+    "de": "Blaue Stunde",
+    "es": "Hora azul",
+    "zh": "蓝调时刻",
+    "pt": "Hora azul"
+  },
+  "Animated": {
+    "en": "Animated",
+    "de": "Animiert",
+    "es": "Animado",
+    "zh": "动态",
+    "pt": "Animado"
+  },
+  "Snowfall": {
+    "en": "Snowfall",
+    "de": "Schneefall",
+    "es": "Nevada",
+    "zh": "飘雪",
+    "pt": "Neve caindo"
+  },
+  "Snowy forest": {
+    "en": "Snowy forest",
+    "de": "Verschneiter Wald",
+    "es": "Bosque nevado",
+    "zh": "雪中森林",
+    "pt": "Floresta nevada"
+  },
+  "Christmas Eve": {
+    "en": "Christmas Eve",
+    "de": "Heiligabend",
+    "es": "Nochebuena",
+    "zh": "平安夜",
+    "pt": "Véspera de Natal"
+  },
+  "Christmas forest": {
+    "en": "Christmas forest",
+    "de": "Weihnachtswald",
+    "es": "Bosque navideño",
+    "zh": "圣诞森林",
+    "pt": "Floresta de Natal"
+  },
+  "Blizzard": {
+    "en": "Blizzard",
+    "de": "Schneesturm",
+    "es": "Ventisca",
+    "zh": "暴风雪",
+    "pt": "Nevasca"
+  },
   "northernLights": {
     "en": "Northern lights",
     "de": "Nordlichter",

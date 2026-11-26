@@ -75,6 +75,10 @@ impl Language {
         }
     }
     pub fn wallpaper(self, id: &str) -> &str {
+        // Animated wallpapers are keyed by their English name.
+        if let Some(animated) = crate::procedural::find(id) {
+            return self.t(animated.name);
+        }
         self.t(match id {
             "dunes" => "monumentValley",
             "san-francisco" => "sanFrancisco",
