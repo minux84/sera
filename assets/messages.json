@@ -1422,5 +1422,29 @@
     "zh": "Sera 会自动重试。",
     "pt": "A Sera vai tentar de novo sozinha.",
     "it": "Sera riproverà da sola."
+  },
+  "inputPoweredOn": {
+    "en": "{name} is on",
+    "de": "{name} ist eingeschaltet",
+    "es": "{name} está encendido",
+    "zh": "{name} 已开启",
+    "pt": "{name} foi ligado",
+    "it": "{name} è acceso"
+  },
+  "inputPromptHint": {
+    "en": "Press OK to switch to it",
+    "de": "OK drücken, um umzuschalten",
+    "es": "Pulsa OK para cambiar a él",
+    "zh": "按 OK 切换过去",
+    "pt": "Pressione OK para mudar para ele",
+    "it": "Premi OK per collegarti"
+  },
+  "inputConnect": {
+    "en": "Switch",
+    "de": "Umschalten",
+    "es": "Cambiar",
+    "zh": "切换",
+    "pt": "Mudar",
+    "it": "Collega"
   }
 }

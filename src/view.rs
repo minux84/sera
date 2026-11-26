@@ -1051,6 +1051,7 @@ pub fn scene_with_pill(
     if let Some((notice, _)) = &state.notice {
         toast(&mut out, state, assets, notice);
     }
+    input_prompt(&mut out, state, assets);
     out
 }
 
@@ -4226,6 +4227,117 @@ fn toast(out: &mut Scene, state: &State, assets: &Assets, notice: &str) {
         };
         motion::transform_group(&mut out.draw[start..], 0., dy, alpha);
     }
+}
+
+/// "Apple TV is on — OK to switch": a plate above the toast with the device
+/// icon, the Connect button (always lit: OK presses it from anywhere) and a
+/// countdown line until it leaves by itself.
+fn input_prompt(out: &mut Scene, state: &State, assets: &Assets) {
+    let Some((id, opened)) = &state.input_prompt else {
+        return;
+    };
+    let Some(input) = state.inventory.inputs.iter().find(|input| &input.id == id) else {
+        return;
+    };
+    let age = opened.elapsed().as_secs_f32();
+    let shown = crate::state::INPUT_PROMPT.as_secs_f32();
+    if state.preferences.reduced_motion && age >= shown {
+        return;
+    }
+    let language = state.preferences.language;
+    let name = state.preferences.input_title(input);
+    let title = language.format("inputPoweredOn", &[("name", name)]);
+    let hint = language.t("inputPromptHint");
+    let button_label = language.t("inputConnect");
+    let title_style = text(26., 600, 0.);
+    let hint_style = text(20., 400, 0.);
+    let button_style = text(22., 600, 0.);
+    let button_w = (assets.width(button_label, button_style) + 64.).max(160.);
+    let words = assets
+        .width(&title, title_style)
+        .max(assets.width(hint, hint_style));
+    let width = (32. + 56. + 24. + words + 32. + button_w + 24.).clamp(560., 1400.);
+    let height = 112.;
+    let lift = if state.notice.is_some() { 120. } else { 0. };
+    let rect = Rect::new(
+        960. - width / 2.,
+        1080. - 56. - height - lift,
+        width,
+        height,
+    );
+    let radius = 40.;
+    let start = out.draw.len();
+    out.shadow(rect, radius, 40., 8., 0.33);
+    out.glass(rect, radius);
+    out.icon(
+        assets,
+        &format!(
+            "input-{}",
+            input_icon(input, state.preferences.input_name(input))
+        ),
+        Rect::new(rect.x + 32., rect.y + (height - 56.) / 2., 56., 56.),
+        c(0xffffff, 0.92),
+    );
+    let words_x = rect.x + 32. + 56. + 24.;
+    let words_w = width - (words_x - rect.x) - 32. - button_w - 24.;
+    out.text(
+        title,
+        line_box(Rect::new(words_x, rect.y + 22., words_w, 36.), title_style),
+        title_style,
+        WHITE,
+        false,
+    );
+    out.text(
+        hint,
+        line_box(Rect::new(words_x, rect.y + 60., words_w, 30.), hint_style),
+        hint_style,
+        c(0xffffff, 0.66),
+        false,
+    );
+    let button = Rect::new(
+        rect.x + width - 24. - button_w,
+        rect.y + (height - 60.) / 2.,
+        button_w,
+        60.,
+    );
+    out.pill(button, true, false);
+    out.text(
+        button_label,
+        line_box(button, button_style),
+        button_style,
+        accent_ink(state),
+        true,
+    );
+    if state.overlay.is_none() {
+        out.control(Target::InputPrompt, button, false);
+    }
+    // Time left, as a hairline along the bottom edge inside the plate.
+    let left = (1. - age / shown).clamp(0., 1.);
+    if left > 0. {
+        let track = Rect::new(
+            rect.x + radius,
+            rect.y + height - 6.,
+            width - 2. * radius,
+            2.,
+        );
+        out.shape(track, 1., c(0xffffff, 0.1));
+        out.shape(
+            Rect::new(track.x, track.y, track.w * left, track.h),
+            1.,
+            c(0xffffff, 0.5),
+        );
+    }
+    if state.preferences.reduced_motion {
+        return;
+    }
+    let (alpha, dy) = if age > shown {
+        let end = motion::progress(age - shown, motion::PANEL_OUT);
+        (1. - end, 12. * end)
+    } else {
+        let enter = motion::progress(age, motion::PANEL_IN);
+        (enter, 12. * (1. - enter))
+    };
+    motion::transform_group(&mut out.draw[start..], 0., dy, alpha);
 }
 
 const SMART_X: f32 = 84.;

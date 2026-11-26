@@ -79,6 +79,9 @@ pub struct Input {
     /// The source is sending a picture (eim getHDMISignalInfo); a sleeping
     /// device keeps the cable's 5 V but stops the signal.
     pub signal: Option<bool>,
+    /// The source drives the cable's 5 V: it is on (possibly still booting,
+    /// before any picture) or asleep with 5 V kept.
+    pub power: Option<bool>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -541,6 +544,7 @@ pub fn demo_inventory() -> Inventory {
                 port: "HDMI 1".into(),
                 connected: Some(true),
                 signal: None,
+                power: None,
             },
             Input {
                 id: "com.webos.app.hdmi2".into(),
@@ -548,6 +552,7 @@ pub fn demo_inventory() -> Inventory {
                 port: "HDMI 2".into(),
                 connected: Some(true),
                 signal: None,
+                power: None,
             },
             Input {
                 id: "com.webos.app.hdmi3".into(),
@@ -555,6 +560,7 @@ pub fn demo_inventory() -> Inventory {
                 port: "HDMI 3".into(),
                 connected: Some(false),
                 signal: None,
+                power: None,
             },
         ],
     };
@@ -567,21 +573,47 @@ pub fn demo_inventory() -> Inventory {
     inventory
 }
 
-/// Store the latest picture report on each HDMI input; returns whether any
-/// input changed.
-pub fn apply_signals(inputs: &mut [Input], signals: &[(u8, bool)]) -> bool {
-    let mut changed = false;
+/// One HDMI port in an eim getHDMISignalInfo report.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct HdmiReport {
+    pub port: u8,
+    /// 5 V on the cable: a PC reports it ~7 s before its first picture.
+    pub power: bool,
+    /// A picture is coming in.
+    pub picture: bool,
+}
+
+/// What one picture report changed on the HDMI inputs.
+#[derive(Debug, Default, PartialEq)]
+pub struct SignalChange {
+    /// Any input's report differs from the previous one.
+    pub changed: bool,
+    /// Inputs whose device was just switched on or woke up: 5 V or a picture
+    /// appeared where the previous report had none. A first report (no
+    /// previous one) is not a switch-on.
+    pub powered_on: Vec<String>,
+}
+
+/// Store the latest picture report on each HDMI input.
+pub fn apply_signals(inputs: &mut [Input], signals: &[HdmiReport]) -> SignalChange {
+    let mut change = SignalChange::default();
     for input in inputs {
         let number = input
             .id
             .strip_prefix("com.webos.app.hdmi")
             .and_then(|n| n.parse::<u8>().ok());
-        if let Some(&(_, on)) = signals.iter().find(|(n, _)| Some(*n) == number)
-            && input.signal != Some(on)
-        {
-            input.signal = Some(on);
-            changed = true;
+        let Some(report) = signals.iter().find(|r| Some(r.port) == number) else {
+            continue;
+        };
+        let rose = |before: Option<bool>, now: bool| now && before == Some(false);
+        if rose(input.power, report.power) || rose(input.signal, report.picture) {
+            change.powered_on.push(input.id.clone());
         }
+        if input.signal != Some(report.picture) {
+            change.changed = true;
+        }
+        input.signal = Some(report.picture);
+        input.power = Some(report.power);
     }
-    changed
+    change
 }

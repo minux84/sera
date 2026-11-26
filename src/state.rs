@@ -1,6 +1,6 @@
 use crate::i18n::Language;
 use crate::model::{
-    App, BACKGROUNDS, CATEGORIES, INPUT_NAME_LIMIT, InputMode, Inventory, Preferences,
+    App, BACKGROUNDS, CATEGORIES, INPUT_NAME_LIMIT, Input, InputMode, Inventory, Preferences,
     clean_input_name,
 };
 use crate::motion;
@@ -162,6 +162,8 @@ pub enum Target {
     CloseDialog,
     Retry,
     DismissNotice,
+    /// The "device switched on" prompt's Connect button.
+    InputPrompt,
     Option(usize),
     Key(usize),
     /// A Home widget block, by its index in `preferences.widgets.blocks`.
@@ -560,6 +562,12 @@ pub struct State {
     /// marks and progress when Sera comes back to the foreground.
     pub web_player_item: Option<i64>,
     pub notice: Option<(String, Instant)>,
+    /// An HDMI input whose device was just switched on, and when: OK opens
+    /// it, Back dismisses, and it leaves by itself after `INPUT_PROMPT`.
+    pub input_prompt: Option<(String, Instant)>,
+    /// The last input offered and when, so the picture arriving seconds
+    /// after its 5 V does not offer (or reopen) it again.
+    input_offered: Option<(String, Instant)>,
     pub error: Option<String>,
     pub dirty: bool,
     pub pointer: bool,
@@ -748,6 +756,8 @@ impl State {
             movie_prefetch: (None, std::collections::HashSet::new()),
             web_player_item: None,
             notice: None,
+            input_prompt: None,
+            input_offered: None,
             error: None,
             dirty: true,
             pointer: false,
@@ -1004,6 +1014,34 @@ impl State {
     pub fn notify(&mut self, text: impl Into<String>) {
         self.notice = Some((text.into(), Instant::now()));
         self.dirty = true;
+    }
+
+    /// Offer to open an input whose device was just switched on. Inputs set
+    /// to Off are never offered, nor anything while an app is opening.
+    pub fn prompt_input(&mut self, id: &str) {
+        if self.launching
+            || self.preferences.input_modes.get(id).copied() == Some(InputMode::Off)
+            || !self.inventory.inputs.iter().any(|input| input.id == id)
+            || self
+                .input_offered
+                .as_ref()
+                .is_some_and(|(last, at)| last == id && at.elapsed() < INPUT_REOFFER)
+        {
+            return;
+        }
+        let now = Instant::now();
+        self.input_offered = Some((id.to_owned(), now));
+        self.input_prompt = Some((id.to_owned(), now));
+        self.dirty = true;
+    }
+
+    /// The input on offer while its prompt is up (not once it is leaving).
+    pub fn prompted_input(&self) -> Option<&Input> {
+        let (id, start) = self.input_prompt.as_ref()?;
+        if start.elapsed() >= INPUT_PROMPT {
+            return None;
+        }
+        self.inventory.inputs.iter().find(|input| &input.id == id)
     }
 
     pub fn focus_level(&self, target: &Target) -> f32 {
@@ -1329,6 +1367,21 @@ impl State {
             self.notice = None;
             self.dirty = true;
         }
+        if let Some((_, start)) = &self.input_prompt {
+            let age = start.elapsed();
+            if age > INPUT_PROMPT + Duration::from_secs_f32(motion::PANEL_OUT) {
+                self.input_prompt = None;
+                self.dirty = true;
+            } else if self.preferences.reduced_motion {
+                // Only the exit needs a frame: the prompt simply disappears.
+                if age >= INPUT_PROMPT {
+                    self.dirty = true;
+                }
+            } else {
+                // The countdown bar moves for the whole time it shows.
+                self.dirty = true;
+            }
+        }
     }
 
     pub fn show_smart_tab(&self) -> bool {
@@ -1425,6 +1478,7 @@ impl State {
                     let age = start.elapsed().as_secs_f32();
                     age < motion::PANEL_IN || (5. ..5. + motion::PANEL_OUT).contains(&age)
                 }))
+            || (!self.preferences.reduced_motion && self.input_prompt.is_some())
     }
 
     pub fn open(&mut self, index: usize) {
@@ -3552,6 +3606,26 @@ impl State {
     }
 
     pub fn activate(&mut self) -> Vec<Effect> {
+        // OK connects to a device that was just switched on, wherever the
+        // focus is; a pointer click does so only on the prompt's button.
+        if self.overlay.is_none()
+            && (!self.pointer || self.focus == Target::InputPrompt)
+            && let Some(id) = self.prompted_input().map(|input| input.id.clone())
+        {
+            self.input_prompt = None;
+            if self.focus == Target::InputPrompt {
+                self.focus = self.first_content();
+            }
+            self.dirty = true;
+            if self.ambient_on() {
+                self.leave_ambient();
+            }
+            return if self.launching {
+                vec![]
+            } else {
+                vec![Effect::Launch(id)]
+            };
+        }
         if self.ambient_on() {
             self.leave_ambient();
             return vec![];
@@ -4390,6 +4464,8 @@ impl State {
             Target::Browse => self.open(1),
             Target::Retry => return vec![Effect::Reload],
             Target::DismissNotice => self.notice = None,
+            // Handled at the top of `activate` while the prompt is up.
+            Target::InputPrompt => {}
             Target::CloseDialog => return self.back(),
             Target::TvSettings => return vec![Effect::Launch("com.palm.app.settings".into())],
             Target::App(id) | Target::Input(id) if !self.launching => {
@@ -4889,6 +4965,14 @@ impl State {
     }
 
     pub fn back(&mut self) -> Vec<Effect> {
+        if self.prompted_input().is_some() {
+            self.input_prompt = None;
+            if self.focus == Target::InputPrompt {
+                self.focus = self.first_content();
+            }
+            self.dirty = true;
+            return vec![];
+        }
         if self.ambient_on() {
             self.leave_ambient();
             return vec![];
@@ -5145,6 +5229,11 @@ pub fn stack_return_curve(offset: f32, t: f32) -> f32 {
     offset * (1. - back_out(u / STACK_RETURN_GLIDE, s))
 }
 
+/// How long the "device switched on" prompt waits for OK.
+pub const INPUT_PROMPT: Duration = Duration::from_secs(12);
+/// The same input is not offered twice within this: 5 V and then the
+/// picture of one switch-on arrive several seconds apart.
+const INPUT_REOFFER: Duration = Duration::from_secs(30);
 /// Clean wallpaper mode: the caption's press, the fly-away, and the stagger
 /// between the interface's blocks (and between stack rows).
 pub const AMBIENT_PRESS: std::time::Duration = std::time::Duration::from_millis(160);

@@ -3,7 +3,7 @@
 //! process trying to impersonate its application identity.
 use crate::{
     app_artwork,
-    model::{App, Input, Inventory, demo_inventory, valid_app_id},
+    model::{App, HdmiReport, Input, Inventory, demo_inventory, valid_app_id},
 };
 use serde_json::{Value, json};
 use std::{collections::HashSet, sync::mpsc, thread};
@@ -50,8 +50,15 @@ pub enum Response {
     Launched(Result<(), String>),
     /// `None` when Homebrew Channel has no root: Sera runs as a plain app.
     Root(Result<Option<RootStatus>, String>),
-    /// (HDMI port number, picture present).
-    Signals(Vec<(u8, bool)>),
+    Signals(Vec<HdmiReport>),
+    /// The same report pushed by the eim subscription, unasked. `true` once
+    /// a push has carried a change, proving the TV sends them: polling can
+    /// then slow down.
+    #[cfg_attr(
+        not(all(feature = "webos", target_os = "linux", target_arch = "arm")),
+        allow(dead_code)
+    )]
+    PushedSignals(Vec<HdmiReport>, bool),
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -78,6 +85,10 @@ impl Platform {
     pub fn new(webos: bool) -> Self {
         let (sender, requests) = mpsc::channel();
         let (responses, receiver) = mpsc::channel();
+        #[cfg(all(feature = "webos", target_os = "linux", target_arch = "arm"))]
+        if webos {
+            watch_signals(responses.clone());
+        }
         thread::spawn(move || {
             while let Ok(request) = requests.recv() {
                 let response = match request {
@@ -469,7 +480,7 @@ pub fn parse_root_status(stdout: &str) -> Option<RootStatus> {
 
 /// Picture present per HDMI port. The reply lists every port whatever id is
 /// asked for. Root first (always allowed), then Sera's own call.
-fn hdmi_signals() -> Result<Vec<(u8, bool)>, String> {
+fn hdmi_signals() -> Result<Vec<HdmiReport>, String> {
     let uri = "luna://com.webos.service.eim/getHDMISignalInfo";
     let command = format!(
         "if [ \"$(id -u)\" = 0 ]; then /usr/bin/luna-send -n 1 -w 3000 {uri} '{{\"id\":\"HDMI_1\"}}'; fi"
@@ -494,11 +505,68 @@ fn hdmi_signals() -> Result<Vec<(u8, bool)>, String> {
     Ok(parse_signals(&reply))
 }
 
-pub fn parse_signals(reply: &Value) -> Vec<(u8, bool)> {
+/// Subscribe to eim's picture reports on a thread of its own, so a device
+/// switching on is seen within a fraction of a second at no polling cost.
+/// The first reply is the current state; only a later one that differs
+/// proves the firmware pushes changes. On any failure the thread ends and
+/// the main loop keeps polling as before.
+#[cfg(all(feature = "webos", target_os = "linux", target_arch = "arm"))]
+fn watch_signals(responses: mpsc::Sender<Response>) {
+    thread::spawn(move || {
+        let mut bus = match crate::luna::Bus::open() {
+            Ok(bus) => bus,
+            Err(error) => return eprintln!("Sera HDMI watch: {error}"),
+        };
+        if let Err(error) = bus.subscribe(
+            "luna://com.webos.service.eim/getHDMISignalInfo",
+            &json!({"id": "HDMI_1", "subscribe": true}),
+        ) {
+            return eprintln!("Sera HDMI watch: {error}");
+        }
+        let mut last: Option<Vec<HdmiReport>> = None;
+        let mut live = false;
+        loop {
+            for event in bus.pump() {
+                if event.get("returnValue") == Some(&Value::Bool(false)) {
+                    return eprintln!("Sera HDMI watch refused: {event}");
+                }
+                let signals = parse_signals(&event);
+                if signals.is_empty() {
+                    continue;
+                }
+                if last.as_ref().is_some_and(|last| *last != signals) && !live {
+                    live = true;
+                    eprintln!("Sera HDMI watch: the TV pushes picture changes");
+                }
+                last = Some(signals.clone());
+                if responses
+                    .send(Response::PushedSignals(signals, live))
+                    .is_err()
+                {
+                    return;
+                }
+            }
+            thread::sleep(std::time::Duration::from_millis(200));
+        }
+    });
+}
+
+/// Anything but "TRUE" is off: some firmware answers "FASLE".
+pub fn parse_signals(reply: &Value) -> Vec<HdmiReport> {
     (1..=4u8)
         .filter_map(|n| {
-            let signal = reply.get(format!("HDMI{n}"))?.get("signal")?.as_str()?;
-            Some((n, signal.eq_ignore_ascii_case("true")))
+            let port = reply.get(format!("HDMI{n}"))?;
+            let on = |key: &str| {
+                port.get(key)
+                    .and_then(Value::as_str)
+                    .is_some_and(|v| v.eq_ignore_ascii_case("true"))
+            };
+            port.get("signal")?.as_str()?;
+            Some(HdmiReport {
+                port: n,
+                power: on("5v"),
+                picture: on("signal"),
+            })
         })
         .collect()
 }
@@ -512,7 +580,7 @@ fn inventory() -> Result<(Inventory, Option<String>), String> {
         .and_then(|raw| normalize_inputs(&raw));
     match inputs {
         Ok(mut inputs) => {
-            crate::model::apply_signals(&mut inputs, &hdmi_signals().unwrap_or_default());
+            let _ = crate::model::apply_signals(&mut inputs, &hdmi_signals().unwrap_or_default());
             eprintln!(
                 "Sera TV inventory: {} apps, {} inputs",
                 apps.len(),
@@ -637,6 +705,7 @@ pub fn normalize_inputs(raw: &Value) -> Result<Vec<Input>, String> {
                 .and_then(Value::as_bool)
                 .or_else(|| entry.get("connected").and_then(Value::as_bool)),
             signal: None,
+            power: None,
         });
     }
     Ok(inputs)

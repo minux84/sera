@@ -222,6 +222,7 @@ fn auto_input_visibility_requires_a_positive_connection_report() {
         port: "HDMI 1".into(),
         connected: None,
         signal: None,
+        power: None,
     };
     assert!(!preferences.input_visible(&input));
     input.connected = Some(true);
@@ -1415,6 +1416,7 @@ fn custom_input_names_keep_the_label_port_and_status_as_detail() {
         port: "HDMI 2".into(),
         connected: Some(true),
         signal: None,
+        power: None,
     };
     let language = preferences.language;
     let status = |preferences: &Preferences| {
@@ -3384,14 +3386,105 @@ fn auto_input_follows_the_hdmi_picture_not_only_the_cable() {
         "HDMI2": {"5v": "TRUE", "signal": "FALSE"},
         "HDMI3": {"5v": "FALSE", "signal": "FALSE"}});
     let signals = crate::platform::parse_signals(&reply);
-    assert_eq!(signals, vec![(1, true), (2, false), (3, false)]);
+    let pictures: Vec<_> = signals.iter().map(|r| (r.port, r.picture)).collect();
+    assert_eq!(pictures, vec![(1, true), (2, false), (3, false)]);
     let mut inputs = demo_inventory().inputs;
-    assert!(crate::model::apply_signals(&mut inputs, &signals));
+    let change = crate::model::apply_signals(&mut inputs, &signals);
+    assert!(change.changed);
+    // The first report is the state Sera found, not a device switching on.
+    assert!(change.powered_on.is_empty());
     let preferences = Preferences::default();
     // Both cables are plugged in; only the device sending a picture shows.
     assert!(preferences.input_visible(&inputs[0]));
     assert!(!preferences.input_visible(&inputs[1]));
-    assert!(!crate::model::apply_signals(&mut inputs, &signals));
+    assert_eq!(
+        crate::model::apply_signals(&mut inputs, &signals),
+        crate::model::SignalChange::default()
+    );
+}
+
+fn report(port: u8, power: bool, picture: bool) -> crate::model::HdmiReport {
+    crate::model::HdmiReport {
+        port,
+        power,
+        picture,
+    }
+}
+
+#[test]
+fn a_device_switching_on_is_reported_once() {
+    let mut inputs = demo_inventory().inputs;
+    let _ = crate::model::apply_signals(
+        &mut inputs,
+        &[report(1, true, true), report(2, false, false)],
+    );
+    let change = crate::model::apply_signals(
+        &mut inputs,
+        &[report(1, false, false), report(2, true, true)],
+    );
+    assert!(change.changed);
+    assert_eq!(change.powered_on, vec!["com.webos.app.hdmi2".to_string()]);
+    let again = crate::model::apply_signals(
+        &mut inputs,
+        &[report(1, false, false), report(2, true, true)],
+    );
+    assert!(again.powered_on.is_empty());
+}
+
+#[test]
+fn a_pc_is_offered_at_its_5v_seconds_before_the_picture() {
+    // As measured on the TV: 5 V at 6403.5 s, the first picture at 6410.8 s,
+    // and "FASLE" from the firmware for a port that is off.
+    let off = json!({"HDMI2": {"5v": "FASLE", "signal": "FALSE"}});
+    let booting = json!({"HDMI2": {"5v": "TRUE", "signal": "FALSE"}});
+    let picture = json!({"HDMI2": {"5v": "TRUE", "signal": "TRUE"}});
+    let mut state = ready();
+    let mut apply = |state: &mut State, reply: &serde_json::Value| {
+        let signals = crate::platform::parse_signals(reply);
+        let change = crate::model::apply_signals(&mut state.inventory.inputs, &signals);
+        for id in &change.powered_on {
+            state.prompt_input(id);
+        }
+        change
+    };
+    assert!(apply(&mut state, &off).powered_on.is_empty());
+    let change = apply(&mut state, &booting);
+    assert_eq!(change.powered_on, vec!["com.webos.app.hdmi2".to_string()]);
+    assert!(state.prompted_input().is_some());
+    // Dismissed; the picture of the same switch-on does not bring it back.
+    let _ = state.back();
+    assert!(!apply(&mut state, &picture).powered_on.is_empty());
+    assert!(state.input_prompt.is_none());
+}
+
+#[test]
+fn ok_switches_to_a_device_that_was_just_switched_on() {
+    let mut state = ready();
+    state.prompt_input("com.webos.app.hdmi2");
+    assert!(state.prompted_input().is_some());
+    let controls = scene(&state).controls;
+    assert!(controls.iter().any(|c| c.target == Target::InputPrompt));
+    // OK opens the input whatever has the focus.
+    assert_ne!(state.focus, Target::InputPrompt);
+    let effects = state.activate();
+    assert!(matches!(effects.as_slice(), [Effect::Launch(id)] if id == "com.webos.app.hdmi2"));
+    assert!(state.input_prompt.is_none());
+}
+
+#[test]
+fn back_dismisses_the_switched_on_prompt_and_off_inputs_are_never_offered() {
+    let mut state = ready();
+    state.prompt_input("com.webos.app.hdmi1");
+    assert!(state.back().is_empty());
+    assert!(state.input_prompt.is_none());
+    state
+        .preferences
+        .input_modes
+        .insert("com.webos.app.hdmi1".into(), InputMode::Off);
+    state.prompt_input("com.webos.app.hdmi1");
+    assert!(state.input_prompt.is_none());
+    state.prompt_input("com.webos.app.unknown");
+    assert!(state.input_prompt.is_none());
 }
 
 fn ha_entity(id: &str, name: &str, state: &str) -> crate::smart_home::Entity {

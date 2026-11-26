@@ -2453,11 +2453,13 @@ fn run() -> Result<(), String> {
     let mut edge_lane_active: Option<Lane> = None;
     let mut edge_armed = true;
     let mut edge_at = Instant::now();
-    // HDMI pictures are polled while Home shows, so Auto inputs follow a
-    // device being switched on or put to sleep.
+    // HDMI pictures (pushed by eim, polled as a fallback) let Auto inputs
+    // follow a device being switched on or put to sleep, and offer it.
     let mut signals_at = Instant::now();
     let mut retry_at = Instant::now();
     let mut signals_pending = false;
+    // The eim subscription has pushed a change: polling only backs it up.
+    let mut signals_live = false;
     let initial_nav =
         view::navigation_for(&assets, state.preferences.language, state.show_smart_tab());
     let mut pill = initial_nav.items[0].x;
@@ -2780,9 +2782,11 @@ fn run() -> Result<(), String> {
                 }
                 Response::Signals(signals) => {
                     signals_pending = false;
-                    if model::apply_signals(&mut state.inventory.inputs, &signals) {
-                        state.dirty = true;
-                    }
+                    apply_hdmi_signals(&mut state, &signals, visible);
+                }
+                Response::PushedSignals(signals, live) => {
+                    signals_live |= live;
+                    apply_hdmi_signals(&mut state, &signals, visible);
                 }
                 Response::Root(result) => {
                     match result {
@@ -2813,11 +2817,13 @@ fn run() -> Result<(), String> {
                 }
             }
         }
+        // Without pushed reports, poll on every page so a device switched
+        // on is offered wherever Sera is; with them, a slow check only
+        // covers a subscription the TV dropped.
         if webos
             && visible
-            && state.page == state::Page::Home
             && !signals_pending
-            && signals_at.elapsed() >= Duration::from_secs(4)
+            && signals_at.elapsed() >= Duration::from_secs(if signals_live { 60 } else { 4 })
         {
             signals_at = Instant::now();
             signals_pending = true;
@@ -4076,6 +4082,18 @@ fn run() -> Result<(), String> {
         .map_err(|e| e.to_string())?;
     }
     Ok(())
+}
+
+/// Store an HDMI picture report and, while Sera shows, offer the input whose
+/// device was just switched on.
+fn apply_hdmi_signals(state: &mut State, signals: &[model::HdmiReport], visible: bool) {
+    let change = model::apply_signals(&mut state.inventory.inputs, signals);
+    if change.changed {
+        state.dirty = true;
+    }
+    if visible && let Some(id) = change.powered_on.last() {
+        state.prompt_input(id);
+    }
 }
 
 fn pointer_position(window: &sdl2::video::Window, x: i32, y: i32) -> Option<(f32, f32)> {
