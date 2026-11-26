@@ -41,7 +41,15 @@ typedef struct {
 static const unsigned char silent_opus_20ms[3]={0xfc,0xff,0xfe};
 // Keep audio at most this far ahead of the newest video PTS.
 #define AUDIO_AHEAD_MS 40
+// NDL calls back on its own threads, also while luma_hw_close() tears the
+// session down. The player therefore lives in static storage that is never
+// freed (a late callback can never touch freed memory), and `active` is only
+// accessed atomically and cleared before NDL is unloaded.
+static LumaNDL slot;
 static LumaNDL *active=NULL;
+static LumaNDL *current(void){return __atomic_load_n(&active,__ATOMIC_ACQUIRE);}
+static int claimed=0;
+static void release_claim(void){__atomic_store_n(&claimed,0,__ATOMIC_RELEASE);}
 static void record(const char *label,int64_t value);
 
 /* NDL DirectMedia is built for game streaming: it always loads Starfish with
@@ -104,38 +112,49 @@ __attribute__((constructor)) static void promote_global(void) {
     if(dladdr((void *)promote_global,&info) && info.dli_fname)
         dlopen(info.dli_fname,RTLD_NOW|RTLD_NOLOAD|RTLD_GLOBAL);
 }
+#define LOG_DIR "/media/developer/com.denisefremov.luma/"
+#define EVENTS_LOG LOG_DIR "luma-ndl-events.log"
+#define EVENTS_LOG_PREV LOG_DIR "luma-ndl-events.prev.log"
 static void record(const char *label,int64_t value) {
-    FILE *f=fopen("/media/developer/com.denisefremov.luma/luma-ndl-events.log","a");
+    // Same cap as src/logs.rs: past 1 MiB keep one backup, start afresh.
+    struct stat st;
+    if(stat(EVENTS_LOG,&st)==0 && st.st_size>1024*1024)rename(EVENTS_LOG,EVENTS_LOG_PREV);
+    FILE *f=fopen(EVENTS_LOG,"a");
     if(f){fprintf(f,"%s %lld\n",label,(long long)value);fclose(f);}
 }
 static void resource_released(const char *reason) {
     record("RESOURCE_RELEASED",0);
-    if(active)__atomic_store_n(&active->errored,1,__ATOMIC_RELEASE);
+    LumaNDL *p=current();
+    if(p)__atomic_store_n(&p->errored,1,__ATOMIC_RELEASE);
 }
 static void callback(int type,long long value,const char *str) {
+    LumaNDL *p=current();
     if(type==0) {
-        if(active){
-            int64_t n=__atomic_add_fetch(&active->frames,1,__ATOMIC_SEQ_CST);
+        if(p){
+            int64_t n=__atomic_add_fetch(&p->frames,1,__ATOMIC_SEQ_CST);
             if(n==1 || n%120==0)record("FRAMEREADY",value);
         }
     } else if(type==0x16)record("LOADCOMPLETED",0);
-    else if(type==0x1a){record("PLAYING",0);if(active)__atomic_store_n(&active->playing,1,__ATOMIC_RELEASE);}
+    else if(type==0x1a){record("PLAYING",0);if(p)__atomic_store_n(&p->playing,1,__ATOMIC_RELEASE);}
     else if(type==0x12 || type==0x13){
         record("ERROR",value);
-        if(active)__atomic_store_n(&active->errored,1,__ATOMIC_RELEASE);
+        if(p)__atomic_store_n(&p->errored,1,__ATOMIC_RELEASE);
     } else if(type==0x1c)record("EOS",0);
     else {
         record("UNKNOWN_CALLBACK",type);
-        if(active) {
-            __atomic_add_fetch(&active->unknown_events,1,__ATOMIC_RELAXED);
-            __atomic_store_n(&active->last_unknown_event,type,__ATOMIC_RELAXED);
+        if(p) {
+            __atomic_add_fetch(&p->unknown_events,1,__ATOMIC_RELAXED);
+            __atomic_store_n(&p->last_unknown_event,type,__ATOMIC_RELAXED);
         }
     }
 }
 void *luma_hw_open(const char *app_id,int width,int height,const char *codec) {
-    if(!app_id||width<=0||height<=0||active)return NULL;
-    LumaNDL *p=calloc(1,sizeof(*p));if(!p)return NULL;
-    active=p;
+    if(!app_id||width<=0||height<=0)return NULL;
+    // Claim the single NDL session; a second open while one is live fails.
+    if(__atomic_exchange_n(&claimed,1,__ATOMIC_ACQ_REL))return NULL;
+    LumaNDL *p=&slot;
+    memset(p,0,sizeof(*p));
+    __atomic_store_n(&active,p,__ATOMIC_RELEASE);
     p->queue_min=INT_MAX;
     record("OPEN",0);
     if(NDL_DirectMediaInit(app_id,resource_released)!=0){
@@ -172,9 +191,10 @@ void *luma_hw_open(const char *app_id,int width,int height,const char *codec) {
     record("LOAD_OK",info.video.type);
     return p;
 fail:
+    __atomic_store_n(&active,NULL,__ATOMIC_RELEASE);
     if(p->loaded)NDL_DirectMediaUnload();
     if(p->initialized)NDL_DirectMediaQuit();
-    free(p);active=NULL;return NULL;
+    release_claim();return NULL;
 }
 int luma_hw_feed(void *opaque,const void *buffer,size_t size,int64_t pts_ns) {
     LumaNDL *p=opaque;
@@ -293,8 +313,10 @@ void luma_hw_close(void *opaque) {
     LumaNDL *p=opaque;
     if(!p)return;
     record("CLOSE",p->fed);
+    // Detach first: callbacks that fire during teardown then see no player
+    // and cannot bump the counters of the next session.
+    __atomic_store_n(&active,NULL,__ATOMIC_RELEASE);
     if(p->loaded)NDL_DirectMediaUnload();
     if(p->initialized)NDL_DirectMediaQuit();
-    active=NULL;
-    free(p);
+    release_claim();
 }

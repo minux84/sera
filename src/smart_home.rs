@@ -635,11 +635,7 @@ pub(crate) fn blur_snapshot(data: &[u8]) -> Option<Vec<u8>> {
 /// One line per tab view change, so a missing camera can be traced on the TV.
 fn log_view(visible: bool, cameras: &[String]) {
     use std::io::Write;
-    if let Ok(mut file) = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open("/tmp/luma-ha-view.log")
-    {
+    if let Ok(mut file) = crate::logs::append("/tmp/luma-ha-view.log") {
         let _ = writeln!(file, "visible={visible} cameras={}", cameras.join(","));
     }
 }
@@ -673,16 +669,25 @@ pub(crate) fn save_auth(path: &std::path::Path, secrets: &Secrets) -> Result<(),
                 .map_err(|e| e.to_string())?;
         }
         let tmp = path.with_extension("json.tmp");
-        let mut f = std::fs::OpenOptions::new()
+        // A temporary left by a crash or power cut would make create_new fail
+        // on every later save. Remove it (a symlink is removed, not followed);
+        // create_new still refuses anything that reappears in between.
+        match std::fs::remove_file(&tmp) {
+            Err(e) if e.kind() != std::io::ErrorKind::NotFound => return Err(e.to_string()),
+            _ => {}
+        }
+        let bytes = serde_json::to_vec(secrets).map_err(|e| e.to_string())?;
+        let written = std::fs::OpenOptions::new()
             .write(true)
             .create_new(true)
             .mode(0o600)
             .open(&tmp)
-            .map_err(|e| e.to_string())?;
-        f.write_all(&serde_json::to_vec(secrets).map_err(|e| e.to_string())?)
-            .and_then(|_| f.sync_all())
-            .map_err(|e| e.to_string())?;
-        std::fs::rename(&tmp, path).map_err(|e| e.to_string())?;
+            .and_then(|mut f| f.write_all(&bytes).and_then(|_| f.sync_all()))
+            .and_then(|_| std::fs::rename(&tmp, path));
+        if let Err(e) = written {
+            let _ = std::fs::remove_file(&tmp);
+            return Err(e.to_string());
+        }
         std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))
             .map_err(|e| e.to_string())?;
         Ok(())
@@ -805,6 +810,23 @@ mod tests {
         assert!(read_auth(&path).is_some());
         let mode = std::fs::metadata(&path).unwrap().permissions().mode();
         assert_eq!(mode & 0o777, 0o600);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+    #[cfg(unix)]
+    #[test]
+    fn auth_save_recovers_from_a_stale_temporary() {
+        let dir = std::env::temp_dir().join(format!("luma-auth-stale-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("ha-auth.json");
+        std::fs::write(path.with_extension("json.tmp"), b"left by a power cut").unwrap();
+        let secrets: Secrets = serde_json::from_str(
+            r#"{"access_token":"a","refresh_token":"r","client_id":"c","expires_at":1}"#,
+        )
+        .unwrap();
+        save_auth(&path, &secrets).unwrap();
+        save_auth(&path, &secrets).unwrap();
+        assert!(read_auth(&path).is_some());
+        assert!(!path.with_extension("json.tmp").exists());
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }

@@ -5,7 +5,6 @@
 #![cfg(all(feature = "webos", target_os = "linux", target_arch = "arm"))]
 use std::{
     ffi::{CString, c_void},
-    fs::OpenOptions,
     io::{Read, Write},
     os::raw::{c_char, c_int},
     process::{Child, Command, Stdio},
@@ -90,10 +89,8 @@ static TRANSITION_EPOCH: OnceLock<Instant> = OnceLock::new();
 /// the other per-device logs.
 pub fn log_transition_event(index: usize, event: &str) {
     let start = TRANSITION_EPOCH.get_or_init(Instant::now);
-    let Ok(mut file) = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open("/media/developer/com.denisefremov.luma/luma-video-transitions.log")
+    let Ok(mut file) =
+        crate::logs::append("/media/developer/com.denisefremov.luma/luma-video-transitions.log")
     else {
         return;
     };
@@ -321,11 +318,7 @@ impl Player {
             .parent()
             .ok_or("No application directory")?
             .join("luma-demux");
-        let log = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open("/media/developer/com.denisefremov.luma/luma-demux.log")
-            .ok();
+        let log = crate::logs::append("/media/developer/com.denisefremov.luma/luma-demux.log").ok();
         let mut cmd = Command::new(demux);
         cmd.arg(if entry.source == "Amazon" {
             "h265"

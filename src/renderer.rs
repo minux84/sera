@@ -2782,11 +2782,7 @@ fn log_image_timing(path: &str, started: std::time::Instant, decoded: Option<&im
     let Some(folder) = Path::new(path).parent().and_then(Path::parent) else {
         return;
     };
-    let Ok(mut log) = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(folder.join("luma-images.log"))
-    else {
+    let Ok(mut log) = crate::logs::append(folder.join("luma-images.log")) else {
         return;
     };
     let size = decoded.map_or("failed".to_owned(), |i| {

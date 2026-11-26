@@ -8,6 +8,7 @@ mod hw_wallpaper;
 mod i18n;
 mod jellyfin;
 mod library;
+mod logs;
 #[cfg(all(feature = "webos", target_os = "linux", target_arch = "arm"))]
 mod luna;
 mod media;
@@ -1850,9 +1851,9 @@ fn run() -> Result<(), String> {
         && options.preferences.is_none()
         && !preferences_path.exists()
     {
-        storage::load(&default_preferences)?
+        storage::load_or_recover(&default_preferences)
     } else {
-        storage::load(&preferences_path)?
+        storage::load_or_recover(&preferences_path)
     };
     let mut state = State::new(initial_preferences);
     let _ = moonlight_service();

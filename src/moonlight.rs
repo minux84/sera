@@ -23,7 +23,7 @@ use rustls::{
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
-    fs::{self, OpenOptions},
+    fs,
     io::{BufRead, BufReader, Read, Write},
     net::{Ipv4Addr, Shutdown, SocketAddrV4, TcpStream, UdpSocket},
     path::{Path, PathBuf},
@@ -1148,11 +1148,7 @@ fn log_phase(stage: usize, message: &str) {
     } else {
         std::env::temp_dir()
     };
-    if let Ok(mut file) = OpenOptions::new()
-        .append(true)
-        .create(true)
-        .open(root.join("luma-moonlight.log"))
-    {
+    if let Ok(mut file) = crate::logs::append(root.join("luma-moonlight.log")) {
         let time = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()

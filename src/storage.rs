@@ -167,14 +167,58 @@ pub fn save(path: &Path, preferences: &Preferences) -> Result<(), String> {
     let temporary = path.with_extension("json.tmp");
     let bytes = serde_json::to_vec_pretty(preferences)
         .map_err(|e| format!("Could not encode preferences: {e}"))?;
-    fs::write(&temporary, bytes).map_err(|e| {
-        format!(
-            "Could not write preferences temporary file {}: {e}",
-            temporary.display()
-        )
-    })?;
+    // TVs are often switched off at the wall. Without fsync the rename can
+    // reach flash before the data does, leaving an empty preferences file.
+    fs::File::create(&temporary)
+        .and_then(|mut file| {
+            use std::io::Write;
+            file.write_all(&bytes)?;
+            file.sync_all()
+        })
+        .map_err(|e| {
+            format!(
+                "Could not write preferences temporary file {}: {e}",
+                temporary.display()
+            )
+        })?;
     fs::rename(&temporary, path)
-        .map_err(|e| format!("Could not replace preferences file {}: {e}", path.display()))
+        .map_err(|e| format!("Could not replace preferences file {}: {e}", path.display()))?;
+    sync_directory(path);
+    Ok(())
+}
+
+/// Makes the rename itself durable. Best effort: not every platform can
+/// open a directory for syncing, and the data is already on disk.
+fn sync_directory(path: &Path) {
+    #[cfg(unix)]
+    if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty())
+        && let Ok(directory) = fs::File::open(parent)
+    {
+        let _ = directory.sync_all();
+    }
+    #[cfg(not(unix))]
+    let _ = path;
+}
+
+/// Startup load for the launcher itself: it must always come up, so an
+/// unreadable or corrupt preferences file falls back to defaults. A corrupt
+/// file is kept aside as `preferences.json.corrupt` for diagnosis and is not
+/// overwritten by the next save.
+pub fn load_or_recover(path: &Path) -> Preferences {
+    match load(path) {
+        Ok(preferences) => preferences,
+        Err(error) => {
+            eprintln!("{error}; starting with default preferences");
+            if path.is_file() {
+                let aside = path.with_extension("json.corrupt");
+                match fs::rename(path, &aside) {
+                    Ok(()) => eprintln!("Unreadable preferences kept as {}", aside.display()),
+                    Err(e) => eprintln!("Could not set unreadable preferences aside: {e}"),
+                }
+            }
+            Preferences::default()
+        }
+    }
 }
 
 /// A missing modern field (not an explicitly empty set) activates one-time migration.

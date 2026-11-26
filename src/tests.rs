@@ -256,6 +256,17 @@ fn preferences_round_trip_and_corrupt_data_is_not_silently_overwritten() {
     assert_eq!(loaded.input_modes["com.webos.app.hdmi1"], InputMode::Off);
     std::fs::write(&path, "broken").unwrap();
     assert!(storage::load(&path).is_err());
+    // A corrupt file must never stop the launcher: defaults, file set aside.
+    let recovered = storage::load_or_recover(&path);
+    assert_eq!(recovered.background, Preferences::default().background);
+    assert!(!path.exists());
+    assert_eq!(
+        std::fs::read(path.with_extension("json.corrupt")).unwrap(),
+        b"broken"
+    );
+    storage::save(&path, &preferences).unwrap();
+    assert!(!path.with_extension("json.tmp").exists());
+    assert_eq!(storage::load(&path).unwrap().background, "forest");
     std::fs::remove_dir_all(directory).unwrap();
 }
 
