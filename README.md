@@ -156,7 +156,7 @@ Then install **Sera** and **Sera Player** from the list. The companion player is
 
 ### Manual (IPK)
 
-Download `it.bytebuilder.sera_2.2.160_arm.ipk` from [Releases](../../releases/latest) and install it with
+Download `it.bytebuilder.sera_3.0.0_arm.ipk` from [Releases](../../releases/latest) and install it with
 [webOS Dev Manager](https://github.com/webosbrew/dev-manager-desktop) or `ares-install`.
 To play Jellyfin and Plex videos, also install `it.bytebuilder.sera.player_0.0.11_all.ipk` from the same release.
 

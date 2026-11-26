@@ -1272,7 +1272,7 @@ dependencies = [
 
 [[package]]
 name = "sera"
-version = "2.2.160"
+version = "3.0.0"
 dependencies = [
  "aes",
  "base64 0.22.1",

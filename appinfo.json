@@ -1,6 +1,6 @@
 {
   "id": "it.bytebuilder.sera",
-  "version": "2.2.160",
+  "version": "3.0.0",
   "vendor": "Sera",
   "type": "native",
   "main": "sera",

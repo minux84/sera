@@ -1,5 +1,16 @@
 # sera
 
+## 3.0.0
+
+### Major Changes
+
+- Rename Luma to Sera. Sera installs as a new app, it.bytebuilder.sera, with its own Player and Aerials companions, and gets releases and the Homebrew Channel feed from minux84/sera.
+
+### Minor Changes
+
+- On its first start, Sera brings over the settings of a Luma installation on the same TV: preferences, weather, the Home Assistant sign-in and custom app artwork. With Homebrew Channel root it can also read Luma's private files.
+- 9520455: Show a wallpaper splash at launch and match the saved background when staging the native Home integration.
+
 ## 2.2.2
 
 ### Patch Changes
