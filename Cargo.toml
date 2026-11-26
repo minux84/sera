@@ -49,6 +49,14 @@ lto = "thin"
 strip = true
 codegen-units = 1
 
+# Faster TV builds for development deploys (LUMA_PROFILE=release-dev):
+# parallel codegen, no LTO and incremental reuse; still optimized and stripped.
+[profile.release-dev]
+inherits = "release"
+lto = false
+codegen-units = 16
+incremental = true
+
 # Keep on-demand glyph geometry responsive in desktop debug previews.
 [profile.dev.package.lyon_tessellation]
 opt-level = 3

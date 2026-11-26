@@ -19,7 +19,8 @@ if (
     'Native package metadata must use com.denisefremov.luma, main luma, and synchronized versions.',
   );
 }
-const binary = path.join(root, 'target/armv7-unknown-linux-gnueabi/release/luma');
+const profile = process.env.LUMA_PROFILE || 'release';
+const binary = path.join(root, 'target/armv7-unknown-linux-gnueabi', profile, 'luma');
 const bytes = await fs.readFile(binary);
 if (
   bytes.length < 52 ||

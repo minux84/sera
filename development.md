@@ -44,9 +44,11 @@ including `armv7-unknown-linux-gnueabi` for TV builds. No browser installation i
 | `pnpm sdk`                | Download/relocate a pinned host webOS SDK                  |
 | `pnpm runtime`            | Prepare checksum-pinned SDL-webOS                          |
 | `pnpm build`              | Release ARM cross-build using `WEBOS_NDK`                  |
+| `pnpm build:fast`         | Parallel, non-LTO `release-dev` cross-build for iteration  |
 | `pnpm run package`        | Assets, cross-build, IPK verification and Homebrew feed    |
 | `pnpm deploy --device tv` | Build/install/launch through an ares device profile        |
 | `pnpm deploy:root`        | Build, then install/launch on a rooted TV over root SSH    |
+| `pnpm deploy:root:fast`   | Same as `deploy:root`, using the `release-dev` build       |
 | `pnpm install:root`       | Install/launch the existing `dist/` IPKs over root SSH     |
 | `pnpm restart:root`       | Close and relaunch the installed Luma over root SSH        |
 | `pnpm check`              | Oxlint and workspace Clippy, without executing tests       |
