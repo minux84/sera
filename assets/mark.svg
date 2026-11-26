@@ -1,17 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
   <defs>
-    <linearGradient id="light" x1="61" y1="24" x2="33" y2="93" gradientUnits="userSpaceOnUse">
+    <linearGradient id="light" x1="44" y1="20" x2="70" y2="92" gradientUnits="userSpaceOnUse">
       <stop stop-color="#d7fbff"/>
       <stop offset=".45" stop-color="#80d9f6"/>
       <stop offset="1" stop-color="#5d73db"/>
     </linearGradient>
-    <linearGradient id="fold" x1="34" y1="79" x2="99" y2="100" gradientUnits="userSpaceOnUse">
+    <linearGradient id="fold" x1="22" y1="0" x2="106" y2="0" gradientUnits="userSpaceOnUse">
       <stop stop-color="#8cf0e6"/>
       <stop offset=".5" stop-color="#48bce5"/>
       <stop offset="1" stop-color="#7371ec"/>
     </linearGradient>
+    <mask id="crescent">
+      <circle cx="60" cy="56" r="36" fill="#fff"/>
+      <circle cx="80" cy="42" r="31" fill="#000"/>
+    </mask>
   </defs>
   <path fill="#25272d" d="M0 0h128v128H0z"/>
-  <path d="M51 24h21L53 75a4 4 0 0 0 4 5h43l-7 20H45C30 100 22 88 27 74l15-41a14 14 0 0 1 9-9Z" fill="url(#light)"/>
-  <path d="M53 75a4 4 0 0 0 4 5h43l-7 20H45c-9 0-16-4-18-10Z" fill="url(#fold)"/>
+  <circle cx="60" cy="56" r="36" fill="url(#light)" mask="url(#crescent)"/>
+  <rect x="22" y="100" width="84" height="9" rx="4.5" fill="url(#fold)"/>
 </svg>
