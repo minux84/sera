@@ -705,6 +705,20 @@ fn script(
             state.notify(&action["notice:".len()..]);
             vec![]
         }
+        // `switch-on:2`: the device on HDMI 2 goes from off to 5 V, as eim
+        // reports a PC starting, so its prompt can be checked and captured.
+        action if action.starts_with("switch-on:") => {
+            if let Ok(port) = action["switch-on:".len()..].parse::<u8>() {
+                let report = |power| model::HdmiReport {
+                    port,
+                    power,
+                    picture: false,
+                };
+                let _ = model::apply_signals(&mut state.inventory.inputs, &[report(false)]);
+                apply_hdmi_signals(state, &[report(true)], true);
+            }
+            vec![]
+        }
         "error" => {
             state.error = Some("luna://org.webosbrew.hbchannel.service/exec failed".into());
             state.inventory.apps.clear();

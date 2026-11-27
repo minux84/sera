@@ -4,14 +4,15 @@
 
 Sera replaces the cluttered LG Home with one calm screen: your favorite apps, live wallpapers, widgets, your Jellyfin and Plex libraries, your PC games over Moonlight and your Home Assistant devices. It's a native Rust app drawn with OpenGL ES, so it stays smooth on TV hardware. Free and open source (MIT).
 
-> Sera is a fork of **[Luma](https://github.com/funnymataleao/luma-webos-launcher)** by [Denis Efremov](https://denisefremov.com), renamed and developed independently. It is not affiliated with or endorsed by the Luma project. See [Credits](#credits).
+> Sera is a fork of **[Luma](https://github.com/funnymataleao/luma-webos-launcher)** by [Denis Efremov](https://denisefremov.com), renamed and developed independently. It builds on everything Luma does, adds new features and optimizes parts of it, such as hardware video playback, HDMI input detection and how settings are stored. It is not affiliated with or endorsed by the Luma project. See [Credits](#credits).
 
 ![Home](docs/screenshots/home.jpg)
 
 ## What's new in Sera
 
-Everything Luma does, plus:
+Everything Luma does, plus new features and optimizations:
 
+- **Switch to a device the moment it turns on**: when a console, PC or streaming box on an HDMI input switches on, Sera shows its name and OK switches to it straight away. Sera listens to the TV's HDMI reports instead of polling them, and a PC is offered as soon as it powers the cable, several seconds before its first picture. Handy for devices without HDMI-CEC.
 - **Animated wallpapers** generated live on the GPU: aurora, waves, plasma, lava lamp, silk, bokeh and Christmas snowfall.
 - **Air quality widget**: European or US AQI, pollutants, a 24-hour outlook and pollen, from Open-Meteo.
 - **Smoother video wallpapers**: hardware playback now runs at the clip's full frame rate instead of dropping to about 15 fps.
@@ -21,6 +22,8 @@ Everything Luma does, plus:
 - **Reliable at the wall switch**: settings survive power cuts, a damaged settings file no longer stops the launcher, and diagnostic logs can't fill the TV's storage.
 - **Opens on a cold boot**: with root, Sera stays in front even when the TV restores the last HDMI input a few seconds after starting.
 - **Moving from Luma**: on its first start Sera brings over Luma's settings, weather location, Home Assistant sign-in and custom app artwork.
+
+![The Apple TV on HDMI 2 has just switched on: OK switches to it](docs/screenshots/input-prompt.jpg)
 
 ## Features
 
