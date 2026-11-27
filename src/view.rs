@@ -1113,25 +1113,40 @@ fn header(
     let nav = layout.surface;
     out.shadow(nav, NAV_HEIGHT / 2., 18., 4., 0.06);
     out.glass(nav, NAV_HEIGHT / 2.);
-    let pill = Rect::new(pill_x, NAV_TOP + NAV_PAD, pill_width, NAV_PILL);
+    // While focus is elsewhere the current page keeps only a quiet frosted
+    // pill; once the remote reaches the navigation it turns into the solid,
+    // lifted, glowing surface so the focused tab is unmistakable.
+    let nav_focus = (0..layout.items.len())
+        .map(|index| state.focus_level(&Target::Nav(index)))
+        .sum::<f32>()
+        .min(1.);
+    let pill = Rect::new(pill_x, NAV_TOP + NAV_PAD, pill_width, NAV_PILL).inset(-3. * nav_focus);
     let nav_accent = state.preferences.accent.use_nav;
     let (first, second) = state.accent_colors();
-    // The selected tab is one solid accent surface with dark-or-light ink chosen
-    // by contrast. No outline: the fill itself is the selection and focus cue.
-    let selected_nav_color = if nav_accent {
+    let focused_nav_color = if nav_accent {
         accent_ink(state)
     } else {
         c(0x15171b, 1.)
     };
-    out.draw.push(if nav_accent {
-        if state.preferences.accent.kind == "gradient" {
-            Draw::DiagonalGradient(pill, NAV_PILL / 2., c(first, 1.), c(second, 1.))
+    let selected_nav_color = blend(WHITE, focused_nav_color, nav_focus);
+    let radius = pill.h / 2.;
+    if nav_focus < 1. {
+        out.shape(pill, radius, c(0xffffff, 0.2 * (1. - nav_focus)));
+    }
+    if nav_focus > 0. {
+        let start = out.draw.len();
+        out.shadow(pill, radius, 22., 6., 0.35);
+        out.draw.push(if nav_accent {
+            if state.preferences.accent.kind == "gradient" {
+                Draw::DiagonalGradient(pill, radius, c(first, 1.), c(second, 1.))
+            } else {
+                Draw::RoundedGradient(pill, radius, c(first, 1.), c(first, 1.))
+            }
         } else {
-            Draw::RoundedGradient(pill, NAV_PILL / 2., c(first, 1.), c(first, 1.))
-        }
-    } else {
-        Draw::RoundedGradient(pill, NAV_PILL / 2., c(0xfafafa, 1.), c(0xe5e5e5, 1.))
-    });
+            Draw::RoundedGradient(pill, radius, c(0xfafafa, 1.), c(0xe5e5e5, 1.))
+        });
+        out.fade(start, nav_focus, 1.);
+    }
     let keys = if state.show_smart_tab() {
         vec!["home", "apps", "Smart Home", "settings"]
     } else {
