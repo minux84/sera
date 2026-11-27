@@ -4024,8 +4024,19 @@ fn run() -> Result<(), String> {
             0
         } else if art_running {
             15
-        } else if sky_running {
-            33
+        } else if sky_running || aurora_running {
+            // Wake exactly when the next 30fps tick is due: a fixed 33ms
+            // wait that lands a hair early skips a whole tick (15fps).
+            let due =
+                |last: Instant| 33u32.saturating_sub(last.elapsed().as_millis().min(33) as u32);
+            let mut wait = 33;
+            if sky_running {
+                wait = wait.min(due(last_sky_frame));
+            }
+            if aurora_running {
+                wait = wait.min(due(last_aurora_frame));
+            }
+            wait.max(1)
         } else if press.is_some()
             || options.frames.is_some()
             || assets.artwork.pending()
