@@ -86,6 +86,12 @@ struct Options {
     profile_frames: Option<usize>,
     weather_test_server: Option<String>,
     test_extra_apps: usize,
+    /// Recompile animated-wallpaper shaders when their files change.
+    live_shaders: bool,
+    /// Start on this wallpaper (e.g. an animated id) for this run.
+    wallpaper: Option<String>,
+    /// Write every animated wallpaper's gallery thumbnail here, then exit.
+    export_thumbnails: Option<PathBuf>,
 }
 
 impl Options {
@@ -117,10 +123,17 @@ impl Options {
                 println!(
                     "\n  --test-extra-apps N  Explicit scroll preview with up to 300 non-launchable extra cards; separate preferences"
                 );
+                println!(
+                    "  --live-shaders      Reload src/shaders/procedural/*.frag on save (desktop preview)\n  --wallpaper ID      Start on this wallpaper, e.g. snow-forest\n  --export-thumbnails DIR  Save animated wallpaper thumbnails (480x270 JPEG) and exit"
+                );
                 std::process::exit(0);
             }
             if arg == "--fullscreen" {
                 result.fullscreen = true;
+                continue;
+            }
+            if arg == "--live-shaders" {
+                result.live_shaders = true;
                 continue;
             }
             let value = args
@@ -141,6 +154,8 @@ impl Options {
                 }
                 "--diagnostics" => result.diagnostics = Some(value.into()),
                 "--weather-test-server" => result.weather_test_server = Some(value),
+                "--wallpaper" => result.wallpaper = Some(value),
+                "--export-thumbnails" => result.export_thumbnails = Some(value.into()),
                 "--test-extra-apps" => {
                     result.test_extra_apps = value
                         .parse::<usize>()
@@ -1855,6 +1870,16 @@ fn run() -> Result<(), String> {
     } else {
         storage::load_or_recover(&preferences_path)
     };
+    let mut initial_preferences = initial_preferences;
+    if let Some(id) = &options.wallpaper {
+        let known = id == "video"
+            || procedural::is_procedural(id)
+            || model::BACKGROUNDS.iter().any(|(photo, _)| photo == id);
+        if !known {
+            return Err(format!("Unknown wallpaper: {id}"));
+        }
+        initial_preferences.background = id.clone();
+    }
     let mut state = State::new(initial_preferences);
     let _ = moonlight_service();
     // Desktop game-card mockup and game Home row, using synthetic preview entries.
@@ -2412,6 +2437,31 @@ fn run() -> Result<(), String> {
         eprintln!("VSync: {error}");
     }
     let mut renderer = renderer::Renderer::new(&assets.root.join("font.ttf"), webos)?;
+    if let Some(dir) = &options.export_thumbnails {
+        std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+        // Time-of-day wallpapers show a snowy sunset in the gallery.
+        procedural::set_day(
+            OffsetDateTime::now_utc().replace_time(time::Time::from_hms(16, 20, 0).unwrap()),
+        );
+        procedural::set_weather(procedural::Conditions::from_weather(
+            weather_sky::Mood::Snow,
+            None,
+        ));
+        for wallpaper in &procedural::ANIMATED {
+            let frame = renderer
+                .export_procedural(wallpaper.id)
+                .ok_or_else(|| format!("Cannot render {}", wallpaper.id))?;
+            let thumbnail =
+                image::imageops::resize(&frame, 480, 270, image::imageops::FilterType::Triangle);
+            let path = dir.join(format!("{}.jpg", wallpaper.id));
+            image::DynamicImage::ImageRgba8(thumbnail)
+                .to_rgb8()
+                .save(&path)
+                .map_err(|e| format!("{}: {e}", path.display()))?;
+            eprintln!("Thumbnail {}", path.display());
+        }
+        return Ok(());
+    }
     renderer.set_fonts(
         state.preferences.heading_font,
         state.preferences.text_font,
@@ -2467,6 +2517,24 @@ fn run() -> Result<(), String> {
     let mut last_frame = Instant::now();
     let mut last_sky_frame = Instant::now();
     let mut last_aurora_frame = Instant::now();
+    // --live-shaders: newest modification time seen in the shader folder.
+    let shader_dir = procedural::source_dir();
+    let shader_stamp = |dir: &std::path::Path| {
+        std::fs::read_dir(dir)
+            .into_iter()
+            .flatten()
+            .flatten()
+            .filter_map(|entry| entry.metadata().ok()?.modified().ok())
+            .max()
+    };
+    let mut shaders_seen = options
+        .live_shaders
+        .then(|| shader_stamp(&shader_dir))
+        .flatten();
+    let mut last_shader_check = Instant::now();
+    if options.live_shaders {
+        eprintln!("Live shaders: watching {}", shader_dir.display());
+    }
     let mut last_art_frame = Instant::now();
     let mut last_minute = None;
     let mut frame = 0u64;
@@ -3747,6 +3815,24 @@ fn run() -> Result<(), String> {
         if sky_running && last_sky_frame.elapsed() >= Duration::from_millis(33) {
             last_sky_frame = Instant::now();
             state.dirty = true;
+        }
+        if options.live_shaders && last_shader_check.elapsed() >= Duration::from_millis(400) {
+            last_shader_check = Instant::now();
+            let stamp = shader_stamp(&shader_dir);
+            if stamp != shaders_seen {
+                shaders_seen = stamp;
+                match renderer.reload_procedural(&shader_dir) {
+                    Ok(()) => {
+                        eprintln!("Live shaders: reloaded");
+                        state.notify("Shaders reloaded");
+                    }
+                    Err(error) => {
+                        eprintln!("Live shaders: kept the previous version\n{error}");
+                        state.notify("Shader error: see the terminal");
+                    }
+                }
+                state.dirty = true;
+            }
         }
         // Apply explicit Settings › Appearance › UI resolution immediately.
         // Resizing the same borderless SDL window avoids tearing down the GL context.

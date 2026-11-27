@@ -387,6 +387,9 @@ pub struct Renderer {
     /// 480x270 render target per draw path, and the animation clock.
     procedural_programs: [GLuint; crate::procedural::Style::ALL.len()],
     procedural_buffer: GLuint,
+    /// Shader prefixes (GLSL version and precision) kept to recompile the
+    /// procedural programs from disk (`--live-shaders`).
+    shader_prefixes: (String, String),
     /// 64x64 random RGBA, sampled per cell (snow): exact in mediump.
     procedural_noise: Texture,
     procedural: HashMap<String, Procedural>,
@@ -509,6 +512,7 @@ impl Renderer {
             }
         };
         // Optional: a driver that rejects one only loses that animated style.
+        let shader_prefixes = (vertex_prefix.clone(), fragment_prefix.clone());
         let procedural_programs = crate::procedural::Style::ALL.map(|style| {
             link(
                 &(vertex_prefix.clone() + include_str!("shaders/procedural/quad.vert")),
@@ -559,6 +563,7 @@ impl Renderer {
             text_program,
             procedural_programs,
             procedural_buffer,
+            shader_prefixes,
             procedural_noise: noise_texture(),
             procedural: HashMap::new(),
             procedural_clock: 0.,
@@ -1652,6 +1657,77 @@ impl Renderer {
         );
     }
 
+    /// Paint animated wallpaper `id` once (its still frame) and read it back,
+    /// for the pre-rendered gallery thumbnails (`--export-thumbnails`).
+    pub fn export_procedural(&mut self, id: &str) -> Option<image::RgbaImage> {
+        let path = crate::procedural::path(id, false);
+        self.procedural.remove(&path);
+        self.procedural_texture(&path)?;
+        let (wallpaper, _) = crate::procedural::parse(&path)?;
+        let (width, height) = wallpaper.style.size();
+        let fbo = self.procedural.get(&path)?.fbo;
+        let mut pixels = vec![0u8; (width * height * 4) as usize];
+        unsafe {
+            let mut previous = 0;
+            gl::GetIntegerv(gl::FRAMEBUFFER_BINDING, &mut previous);
+            gl::BindFramebuffer(gl::FRAMEBUFFER, fbo);
+            gl::PixelStorei(gl::PACK_ALIGNMENT, 1);
+            gl::ReadPixels(
+                0,
+                0,
+                width,
+                height,
+                gl::RGBA,
+                gl::UNSIGNED_BYTE,
+                pixels.as_mut_ptr().cast(),
+            );
+            gl::BindFramebuffer(gl::FRAMEBUFFER, previous as GLuint);
+        }
+        // Row 0 of the target is the top of the picture (see quad.vert).
+        image::RgbaImage::from_raw(width as u32, height as u32, pixels)
+    }
+
+    /// Recompile every animated-wallpaper shader from `dir`. A style that
+    /// fails keeps its previous program; the errors come back joined.
+    pub fn reload_procedural(&mut self, dir: &Path) -> Result<(), String> {
+        let read = |name: &str| {
+            std::fs::read_to_string(dir.join(name)).map_err(|error| format!("{name}: {error}"))
+        };
+        let vertex = read("quad.vert")?;
+        let common = read("common.frag")?;
+        let (vertex_prefix, fragment_prefix) = self.shader_prefixes.clone();
+        let mut errors = Vec::new();
+        for (index, style) in crate::procedural::Style::ALL.into_iter().enumerate() {
+            let body = match style.read_shader(dir) {
+                Ok(body) => body,
+                Err(error) => {
+                    errors.push(format!("{}: {error}", style.file()));
+                    continue;
+                }
+            };
+            match link(
+                &(vertex_prefix.clone() + &vertex),
+                &(fragment_prefix.clone() + &common + &body),
+                &[c"a_position"],
+            ) {
+                Ok(program) => {
+                    let old = std::mem::replace(&mut self.procedural_programs[index], program);
+                    if old != 0 {
+                        unsafe { gl::DeleteProgram(old) };
+                    }
+                }
+                Err(error) => errors.push(format!("{} ({style:?}): {error}", style.file())),
+            }
+        }
+        // Repaint every target, stills included, with the new programs.
+        self.procedural.clear();
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors.join("\n"))
+        }
+    }
+
     /// The texture of a `procedural:` draw path, painted at most once per
     /// renderer frame (a still: once ever). Runs while commands are being
     /// built, before the screen pass, and restores the bound framebuffer.
@@ -1717,6 +1793,9 @@ impl Renderer {
                 self.procedural_clock
             });
             let shot = crate::procedural::frame(wallpaper, seconds);
+            // Time-of-day styles bring their own colours for this moment.
+            let palette = shot.palette.as_ref().unwrap_or(palette);
+            let params = shot.params.unwrap_or(wallpaper.params);
             let fbo = self.procedural[path].fbo;
             unsafe {
                 let mut previous = 0;
@@ -1742,7 +1821,11 @@ impl Renderer {
                 gl::Uniform3fv(at(c"u_base"), 1, palette.base.as_ptr());
                 gl::Uniform3fv(at(c"u_accent"), 1, palette.accent.as_ptr());
                 gl::Uniform4fv(at(c"u_phase"), 1, shot.phase.as_ptr());
-                gl::Uniform4fv(at(c"u_params"), 1, wallpaper.params.as_ptr());
+                gl::Uniform4fv(at(c"u_params"), 1, params.as_ptr());
+                // Only styles that declare it read it (location -1 is ignored).
+                gl::Uniform4fv(at(c"u_drift"), 1, shot.drift.as_ptr());
+                gl::Uniform4fv(at(c"u_weather"), 1, shot.weather.as_ptr());
+                gl::Uniform4fv(at(c"u_season"), 1, shot.season.as_ptr());
                 gl::Uniform1i(at(c"u_noise"), 0);
                 gl::ActiveTexture(gl::TEXTURE0);
                 gl::BindTexture(gl::TEXTURE_2D, self.procedural_noise.id);

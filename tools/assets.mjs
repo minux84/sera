@@ -128,6 +128,16 @@ for (const file of await fs.readdir(path.join(source, 'wallpapers'))) {
     .jpeg({ quality: 82 })
     .toFile(path.join(out, 'thumbnails', `${id}.jpg`));
 }
+// Animated wallpapers are drawn live, but their gallery thumbnails are
+// pre-rendered (`sera --export-thumbnails assets/animated-thumbnails`).
+for (const file of await fs.readdir(path.join(source, 'animated-thumbnails'))) {
+  if (file.endsWith('.jpg')) {
+    await fs.copyFile(
+      path.join(source, 'animated-thumbnails', file),
+      path.join(out, 'thumbnails', file),
+    );
+  }
+}
 // Compact offline posters for all 289 original online sources.
 // Only images are packaged, never full-resolution video files.
 await fs.mkdir(path.join(out, 'video-thumbnails'), { recursive: true });

@@ -12,6 +12,7 @@
   },
   "scripts": {
     "dev": "cargo run --locked --",
+    "shaders": "cargo run --locked -- --live-shaders --preferences .build/shader-preview.json",
     "build": "sh tools/build-webos.sh",
     "build:fast": "SERA_PROFILE=release-dev sh tools/build-webos.sh",
     "package": "pnpm assets && pnpm build && node tools/package.mjs && node tools/repository.mjs",

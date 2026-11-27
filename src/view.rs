@@ -94,12 +94,10 @@ impl Assets {
         }
     }
     /// Gallery thumbnail of wallpaper `id`.
+    /// Animated wallpapers too: their thumbnails are pre-rendered JPEGs, so
+    /// opening the gallery never paints twenty shaders at once.
     pub(crate) fn wallpaper_thumbnail(&self, id: &str) -> String {
-        if crate::procedural::is_procedural(id) {
-            crate::procedural::path(id, false)
-        } else {
-            self.path(format!("thumbnails/{id}.jpg"))
-        }
+        self.path(format!("thumbnails/{id}.jpg"))
     }
 
     /// Exact glyph metrics, matched to the renderer's live font selection.
@@ -650,6 +648,20 @@ pub fn scene_with_pill(
     now: OffsetDateTime,
 ) -> Scene {
     settings_art::set_now(now);
+    crate::procedural::set_day(now);
+    // Sunrise and sunset of the landscape wallpapers follow the weather
+    // location (45°N without one).
+    crate::procedural::set_latitude(
+        state
+            .preferences
+            .weather_location
+            .as_ref()
+            .map(|l| l.latitude),
+    );
+    if state.preferences.background == "live-weather" {
+        let (mood, reading) = widgets_view::weather_now(state);
+        crate::procedural::set_weather(crate::procedural::Conditions::from_weather(mood, reading));
+    }
     let mut out = Scene::new();
     if state.preferences.background == "video" {
         // Keep one stable scrim over both the transition still and the live

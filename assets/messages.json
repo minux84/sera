@@ -1207,6 +1207,46 @@
     "pt": "Nevasca",
     "it": "Bufera di neve"
   },
+  "Winter day": {
+    "en": "Winter day",
+    "de": "Wintertag",
+    "es": "Día de invierno",
+    "zh": "冬日",
+    "pt": "Dia de inverno",
+    "it": "Giornata d'inverno"
+  },
+  "Live weather": {
+    "en": "Live weather",
+    "de": "Live-Wetter",
+    "es": "Tiempo en vivo",
+    "zh": "实时天气",
+    "pt": "Tempo ao vivo",
+    "it": "Meteo dal vivo"
+  },
+  "Spring day": {
+    "en": "Spring day",
+    "de": "Frühlingstag",
+    "es": "Día de primavera",
+    "zh": "春日",
+    "pt": "Dia de primavera",
+    "it": "Giornata di primavera"
+  },
+  "Summer day": {
+    "en": "Summer day",
+    "de": "Sommertag",
+    "es": "Día de verano",
+    "zh": "夏日",
+    "pt": "Dia de verão",
+    "it": "Giornata d'estate"
+  },
+  "Autumn day": {
+    "en": "Autumn day",
+    "de": "Herbsttag",
+    "es": "Día de otoño",
+    "zh": "秋日",
+    "pt": "Dia de outono",
+    "it": "Giornata d'autunno"
+  },
   "northernLights": {
     "en": "Northern lights",
     "de": "Nordlichter",

@@ -9,6 +9,11 @@
 
 use std::f64::consts::TAU;
 
+/// Where the shader sources live in the checkout, for `--live-shaders`.
+pub fn source_dir() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/shaders/procedural")
+}
+
 /// Draw path prefix: `procedural:<id>` animates, `procedural:<id>@still`
 /// is one fixed frame (thumbnails, Reduce Motion).
 pub const PREFIX: &str = "procedural:";
@@ -37,10 +42,15 @@ pub enum Style {
     Snow,
     /// Snow falling through a pine forest silhouette.
     SnowForest,
+    /// Snowy mountains and pines whose sky, light, sun and moon follow the
+    /// local time of day.
+    SnowDay,
+    /// The Winter day scene reacting to the weather widget's conditions.
+    WeatherDay,
 }
 
 impl Style {
-    pub const ALL: [Self; 8] = [
+    pub const ALL: [Self; 10] = [
         Self::Aurora,
         Self::Waves,
         Self::Plasma,
@@ -49,6 +59,8 @@ impl Style {
         Self::Bokeh,
         Self::Snow,
         Self::SnowForest,
+        Self::SnowDay,
+        Self::WeatherDay,
     ];
     pub fn index(self) -> usize {
         Self::ALL.iter().position(|s| *s == self).unwrap_or(0)
@@ -63,17 +75,53 @@ impl Style {
             Self::Silk => include_str!("shaders/procedural/silk.frag"),
             Self::Bokeh => include_str!("shaders/procedural/bokeh.frag"),
             Self::Snow => include_str!("shaders/procedural/snow.frag"),
+            Self::SnowDay => include_str!("shaders/procedural/snowday.frag"),
+            Self::WeatherDay => concat!(
+                "#define WEATHER\n",
+                include_str!("shaders/procedural/snowday.frag")
+            ),
             Self::SnowForest => concat!(
                 "#define TREES\n",
                 include_str!("shaders/procedural/snow.frag")
             ),
         }
     }
+    /// Source file of the style in `shaders/procedural/`.
+    pub fn file(self) -> &'static str {
+        match self {
+            Self::Aurora => "aurora.frag",
+            Self::Waves => "waves.frag",
+            Self::Plasma => "plasma.frag",
+            Self::Lava => "lava.frag",
+            Self::Silk => "silk.frag",
+            Self::Bokeh => "bokeh.frag",
+            Self::Snow | Self::SnowForest => "snow.frag",
+            Self::SnowDay | Self::WeatherDay => "snowday.frag",
+        }
+    }
+    /// Preprocessor lines the style prepends to its file.
+    fn defines(self) -> &'static str {
+        match self {
+            Self::SnowForest => "#define TREES\n",
+            Self::WeatherDay => "#define WEATHER\n",
+            _ => "",
+        }
+    }
+    /// Fragment body read from `dir` (live shader preview), defines included.
+    pub fn read_shader(self, dir: &std::path::Path) -> std::io::Result<String> {
+        Ok(self.defines().to_owned() + &std::fs::read_to_string(dir.join(self.file()))?)
+    }
     /// Render-target size: smooth styles need very few fragments; styles
     /// with edges get a quarter of 1080p so the stretch stays crisp.
     pub fn size(self) -> (i32, i32) {
         match self {
-            Self::Waves | Self::Silk | Self::Lava | Self::Snow | Self::SnowForest => (960, 540),
+            Self::Waves
+            | Self::Silk
+            | Self::Lava
+            | Self::Snow
+            | Self::SnowForest
+            | Self::SnowDay
+            | Self::WeatherDay => (960, 540),
             _ => (480, 270),
         }
     }
@@ -158,7 +206,7 @@ const fn snow(
 }
 
 /// Settings › Wallpaper › Animated, in gallery order.
-pub const ANIMATED: [Wallpaper; 18] = [
+pub const ANIMATED: [Wallpaper; 23] = [
     wallpaper(
         "aurora",
         "Aurora",
@@ -319,6 +367,65 @@ pub const ANIMATED: [Wallpaper; 18] = [
         2.4,
         0.72,
     ),
+    // Sky, light and colours come from the time of day (see `daylight`).
+    snow(
+        "winter-day",
+        "Winter day",
+        Style::SnowDay,
+        0x050a1c,
+        0x16243f,
+        (0x9db8ff, 0., 0.),
+        [0xa8bcd8, 0xc8d8ee, 0xe4eefa, 0xffffff],
+        0.8,
+        0.36,
+    ),
+    // The same scene driven by the weather widget (see `Conditions`).
+    snow(
+        "live-weather",
+        "Live weather",
+        Style::WeatherDay,
+        0x050a1c,
+        0x16243f,
+        (0x9db8ff, 0., 0.),
+        [0xa8bcd8, 0xc8d8ee, 0xe4eefa, 0xffffff],
+        0.8,
+        0.36,
+    ),
+    // The other seasons of the same scene, fixed: (day of year, cloud cover)
+    // in place of the glow position. No snow falls.
+    snow(
+        "spring-day",
+        "Spring day",
+        Style::WeatherDay,
+        0x050a1c,
+        0x16243f,
+        (0x9db8ff, 140., 0.45),
+        [0xa8bcd8, 0xc8d8ee, 0xe4eefa, 0xffffff],
+        0.8,
+        0.,
+    ),
+    snow(
+        "summer-day",
+        "Summer day",
+        Style::WeatherDay,
+        0x050a1c,
+        0x16243f,
+        (0x9db8ff, 196., 0.),
+        [0xa8bcd8, 0xc8d8ee, 0xe4eefa, 0xffffff],
+        0.8,
+        0.,
+    ),
+    snow(
+        "autumn-day",
+        "Autumn day",
+        Style::WeatherDay,
+        0x050a1c,
+        0x16243f,
+        (0x9db8ff, 298., 0.45),
+        [0xa8bcd8, 0xc8d8ee, 0xe4eefa, 0xffffff],
+        0.8,
+        0.,
+    ),
 ];
 
 pub fn find(id: &str) -> Option<&'static Wallpaper> {
@@ -346,8 +453,19 @@ pub fn parse(path: &str) -> Option<(&'static Wallpaper, bool)> {
 /// Shader inputs of one moment. Coordinates are in screen heights with the
 /// origin top-left, so x runs to 16/9. What each point means is per style.
 pub struct Frame {
+    /// Live weather: (cloud cover, rain 0/1, fog, lightning flash).
+    pub weather: [f32; 4],
+    /// Live weather: (snow on the ground, greenery, flowers, autumn leaves).
+    pub season: [f32; 4],
     pub points: [[f32; 4]; POINTS],
     pub phase: [f32; 4],
+    /// Colours and tuning that change over time (time of day), replacing
+    /// the wallpaper's own.
+    pub palette: Option<Palette>,
+    pub params: Option<[f32; 4]>,
+    /// Slow drift in [0, 1) (Winter day's clouds; integer multiples of it
+    /// stay seamless where it wraps).
+    pub drift: [f32; 4],
 }
 
 fn wrap(v: f64) -> f32 {
@@ -431,7 +549,7 @@ pub fn frame(wallpaper: &Wallpaper, seconds: Option<f64>) -> Frame {
             ];
         }
         // Filled in below: snow needs the wallpaper's own tuning.
-        Style::Snow | Style::SnowForest => {}
+        Style::Snow | Style::SnowForest | Style::SnowDay | Style::WeatherDay => {}
         Style::Bokeh => {
             // Centre x, centre y, radius, brightness of eight lights.
             for (i, p) in points.iter_mut().enumerate() {
@@ -445,7 +563,35 @@ pub fn frame(wallpaper: &Wallpaper, seconds: Option<f64>) -> Frame {
             }
         }
     }
-    if matches!(style, Style::Snow | Style::SnowForest) {
+    // Seasonal days pin a day of the year (params[2]) and a cloud cover
+    // (params[3]) instead of following the widget; Live weather has 0 there.
+    let fixed_day = (style == Style::WeatherDay && wallpaper.params[2] > 0.)
+        .then_some((wallpaper.params[2], wallpaper.params[3]));
+    let weather = (style == Style::WeatherDay).then(|| match fixed_day {
+        Some((_, cover)) => Conditions {
+            cover,
+            ..Conditions::CLEAR
+        },
+        None => conditions(),
+    });
+    // The season sets the hours of daylight, mapped onto the winter
+    // keyframes so dawn and dusk land at the real times.
+    // The landscape's season: fixed for Spring/Summer/Autumn day, today's
+    // for Live weather.
+    let season = weather.as_ref().map(|_| match fixed_day {
+        Some((day, _)) => Season::on(day, latitude()),
+        None => Season::now(latitude()),
+    });
+    // The sun always follows today's real sunrise and sunset, whatever
+    // season the landscape shows (Winter day included).
+    let daylight_now = matches!(style, Style::SnowDay | Style::WeatherDay).then(|| {
+        let hour = day_hour();
+        daylight(Season::now(latitude()).winter_hour(hour))
+    });
+    if matches!(
+        style,
+        Style::Snow | Style::SnowForest | Style::SnowDay | Style::WeatherDay
+    ) {
         // Per layer, far to near: cells per screen height, fall speed in
         // screen heights per second, flake radius in cells, brightness.
         const LAYERS: [(f64, f64, f32, f32); 4] = [
@@ -455,14 +601,28 @@ pub fn frame(wallpaper: &Wallpaper, seconds: Option<f64>) -> Frame {
             (10., 0.075, 0.16, 1.),
         ];
         let [speed, density, ..] = wallpaper.params;
+        // Winter day snows less by day than by night; Live weather only
+        // when and as hard as it really snows or rains.
+        let density = match &weather {
+            Some(w) => density * 1.6 * w.precipitation,
+            None => density * daylight_now.as_ref().map_or(1., |d| d.2),
+        };
+        // Rain falls fast; wind slants whatever falls.
         let speed = f64::from(speed);
+        let (fall_speed, wind) = match &weather {
+            Some(w) => (
+                speed * if w.rain { 7. } else { 1. },
+                0.08 + f64::from(w.wind) / 40.,
+            ),
+            None => (speed, 0.3 * speed),
+        };
         for (i, (cells, fall, radius, bright)) in LAYERS.into_iter().enumerate() {
             let k = i as f64;
             // The noise texture repeats every 64 cells: offsets wrap there
             // with no seam, and split into whole cells and a fraction so the
             // shader's coordinates stay small enough for mediump.
-            let down = (t * fall * speed * cells).rem_euclid(64.);
-            let across = (t * fall * speed * 0.3 * speed * cells).rem_euclid(64.);
+            let down = (t * fall * fall_speed * cells).rem_euclid(64.);
+            let across = (t * fall * fall_speed * wind * cells).rem_euclid(64.);
             points[i] = [
                 down.fract() as f32,
                 down.floor() as f32,
@@ -478,12 +638,529 @@ pub fn frame(wallpaper: &Wallpaper, seconds: Option<f64>) -> Frame {
             phase[i] = across.floor() as f32;
         }
     }
-    Frame { points, phase }
+    let (palette, params) = match daylight_now {
+        Some((mut palette, mut params, _)) => {
+            if let Some(s) = &season {
+                // Autumn light is warm and golden; summer skies a deeper blue.
+                let warm = [1.0, 0.72, 0.4];
+                palette.accent = mix(palette.accent, warm, s.autumn * 0.5);
+                palette.colors[4] = mix(
+                    palette.colors[4],
+                    mix(palette.colors[4], warm, 0.5),
+                    s.autumn * 0.35,
+                );
+                let summer = (1. - s.snow) * (1. - s.autumn) * (1. - s.flowers * 0.5);
+                let deep = |c: [f32; 3]| {
+                    let l = (c[0] + c[1] + c[2]) / 3.;
+                    [0, 1, 2].map(|i| (l + (c[i] - l) * 1.35).clamp(0., 1.))
+                };
+                palette.base = mix(palette.base, deep(palette.base), summer * 0.6);
+                palette.colors[4] = mix(palette.colors[4], deep(palette.colors[4]), summer * 0.6);
+            }
+            if let Some(w) = &weather {
+                overcast_light(&mut palette, &mut params, w);
+            }
+            (Some(palette), Some(params))
+        }
+        None => (None, None),
+    };
+    // Live weather: cloud cover, rain instead of snow, fog, lightning.
+    let weather_uniform = weather.map_or([0.; 4], |w| {
+        [
+            w.cover,
+            if w.rain { 1. } else { 0. },
+            w.fog,
+            if w.storm { lightning(t) } else { 0. },
+        ]
+    });
+    // Clouds cross the sky in roughly three minutes at the base speed. The
+    // overcast row drifts in screen heights and repeats every 4 (twice that
+    // for its back layer, which moves 1.5x as fast): wrapping at 8 is seamless.
+    let drift = [
+        (t * 0.006).fract() as f32,
+        (t * 0.004).rem_euclid(8.) as f32,
+        0.,
+        0.,
+    ];
+    // Ground and trees: (snow cover, greenery, flowers, autumn).
+    let season_uniform = match (season, &weather) {
+        (Some(s), Some(w)) => {
+            // Real snowfall whitens the ground whatever the date.
+            let snow = if w.rain {
+                s.snow
+            } else {
+                s.snow.max(w.precipitation.min(0.85))
+            };
+            [
+                snow,
+                (1. - snow).max(0.),
+                s.flowers * (1. - snow),
+                s.autumn * (1. - snow),
+            ]
+        }
+        _ => [1., 0., 0., 0.],
+    };
+    Frame {
+        season: season_uniform,
+        weather: weather_uniform,
+        points,
+        phase,
+        palette,
+        params,
+        drift,
+    }
+}
+
+/// Weather the Live weather wallpaper shows, from the widget's conditions.
+#[derive(Clone, Copy)]
+pub struct Conditions {
+    /// 0 clear sky .. 1 fully overcast.
+    pub cover: f32,
+    /// 0 none .. 1 heavy snow or rain.
+    pub precipitation: f32,
+    pub rain: bool,
+    pub fog: f32,
+    /// km/h.
+    pub wind: f32,
+    pub storm: bool,
+}
+
+impl Conditions {
+    const CLEAR: Self = Self {
+        cover: 0.,
+        precipitation: 0.,
+        rain: false,
+        fog: 0.,
+        wind: 0.,
+        storm: false,
+    };
+
+    /// From the widget's mood and, when there is one, its reading (the WMO
+    /// code sets light / moderate / heavy precipitation).
+    pub fn from_weather(
+        mood: crate::weather_sky::Mood,
+        reading: Option<crate::weather::Reading>,
+    ) -> Self {
+        use crate::weather_sky::Mood;
+        let code = reading.map_or(0, |r| r.code);
+        let intensity = match code {
+            51 | 56 | 61 | 66 | 71 | 77 | 80 | 85 => 0.45,
+            55 | 57 | 65 | 67 | 75 | 82 | 86 | 99 => 1.,
+            _ => 0.75,
+        };
+        let mut c = Self::CLEAR;
+        c.wind = reading.map_or(0., |r| r.wind_speed as f32);
+        match mood {
+            Mood::Clear | Mood::Night => {}
+            Mood::Partly => c.cover = 0.45,
+            Mood::Wind => {
+                c.cover = 0.5;
+                c.wind = c.wind.max(40.);
+            }
+            Mood::Cloudy | Mood::NightCloudy => c.cover = 0.9,
+            Mood::Fog => {
+                c.cover = 0.9;
+                c.fog = 1.;
+            }
+            Mood::Rain => {
+                c.cover = 1.;
+                c.rain = true;
+                c.precipitation = intensity;
+            }
+            Mood::Storm => {
+                c.cover = 1.;
+                c.rain = true;
+                c.storm = true;
+                c.precipitation = 1.;
+            }
+            Mood::Snow => {
+                c.cover = 1.;
+                c.precipitation = intensity;
+            }
+        }
+        c
+    }
+}
+
+static WEATHER: std::sync::Mutex<Conditions> = std::sync::Mutex::new(Conditions::CLEAR);
+
+/// The widget's current weather, for the frame being built.
+pub fn set_weather(conditions: Conditions) {
+    if let Ok(mut current) = WEATHER.lock() {
+        *current = conditions;
+    }
+}
+
+fn conditions() -> Conditions {
+    WEATHER.lock().map_or(Conditions::CLEAR, |c| *c)
+}
+
+/// A grey, dimmer sky under cloud: colours lose saturation and light, the
+/// sun or moon's light greys, stars hide.
+fn overcast_light(palette: &mut Palette, params: &mut [f32; 4], w: &Conditions) {
+    // Overcast skies lose almost all their colour; rain and storms darken
+    // the whole scene on top of that.
+    let dark = w.cover * 0.22
+        + if w.rain { 0.15 * w.precipitation } else { 0. }
+        + if w.storm { 0.25 } else { 0. }
+        + w.fog * 0.05;
+    let grey = |c: [f32; 3]| {
+        let l = 0.3 * c[0] + 0.55 * c[1] + 0.15 * c[2];
+        mix(c, [l, l * 1.01, l * 1.05], w.cover * 0.9).map(|v| v * (1. - dark))
+    };
+    palette.base = grey(palette.base);
+    palette.colors[4] = grey(palette.colors[4]);
+    for flake in palette.colors.iter_mut().take(4) {
+        *flake = mix(*flake, grey(*flake), 0.5);
+    }
+    palette.accent = mix(palette.accent, [0.75, 0.78, 0.82], w.cover * 0.8);
+    params[2] *= 1. - dark * 0.7;
+    params[3] *= 1. - w.cover;
+}
+
+/// Brief lightning flashes at irregular moments (one chance every 6 s).
+fn lightning(t: f64) -> f32 {
+    let slot = (t / 6.).floor();
+    let pick = ((slot * 12.9898).sin() * 43758.5453).fract().abs();
+    if pick < 0.45 {
+        return 0.;
+    }
+    let at = (t - slot * 6.) - pick * 4.;
+    if at < 0. {
+        return 0.;
+    }
+    // A bright flash and a fainter second one just after.
+    ((-at * 14.).exp() + 0.5 * (-(at - 0.18).abs() * 20.).exp()).min(1.) as f32
+}
+
+/// Hours since local midnight of the frame being drawn (fractional).
+static DAY_HOUR: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+/// Latitude of the weather location (f32 bits); 45°N until one is set.
+static LATITUDE: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0x4234_0000);
+
+/// The weather location's latitude (south flips the seasons), if any.
+pub fn set_latitude(latitude: Option<f64>) {
+    let value = latitude.map_or(45., |l| l as f32);
+    LATITUDE.store(value.to_bits(), std::sync::atomic::Ordering::Relaxed);
+}
+
+fn latitude() -> f32 {
+    f32::from_bits(LATITUDE.load(std::sync::atomic::Ordering::Relaxed))
+}
+/// Day of the year (1..=366) of the frame being drawn.
+static DAY_OF_YEAR: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(355);
+
+/// The season at the frame's date, for Live weather. Values are smooth
+/// through the year (no jump on the first of a month).
+#[derive(Clone, Copy)]
+struct Season {
+    /// Snow lying on the ground and trees, 0..1.
+    snow: f32,
+    /// Spring and early summer meadow flowers, 0..1.
+    flowers: f32,
+    /// Autumn colours and fallen leaves, 0..1.
+    autumn: f32,
+    /// Local sunrise and sunset (hours, with summer time).
+    sunrise: f32,
+    sunset: f32,
+}
+
+impl Season {
+    fn now(latitude: f32) -> Self {
+        Self::on(
+            DAY_OF_YEAR.load(std::sync::atomic::Ordering::Relaxed) as f32,
+            latitude,
+        )
+    }
+
+    /// The season on day `day` of the year.
+    fn on(mut day: f32, latitude: f32) -> Self {
+        if latitude < 0. {
+            day = (day + 182.5) % 365.;
+        }
+        let turn = std::f32::consts::TAU / 365.;
+        let summer = 0.5 + 0.5 * ((day - 172.) * turn).cos();
+        // Distance in days around the year, for seasonal bumps.
+        let near = |centre: f32, width: f32| {
+            let d = (day - centre).rem_euclid(365.);
+            let d = d.min(365. - d);
+            (-(d / width).powi(2)).exp()
+        };
+        let ramp = |from: f32, to: f32| {
+            let t = ((day - from) / (to - from)).clamp(0., 1.);
+            t * t * (3. - 2. * t)
+        };
+        // Snow settles in the second and third week of December and melts
+        // through March; autumn holds from early October until it comes.
+        let snow = if day > 200. {
+            ramp(340., 356.)
+        } else {
+            1. - ramp(60., 85.)
+        };
+        let autumn = ramp(250., 275.) * (1. - ramp(340., 356.));
+        // Day length grows with latitude (about 8.7 to 15.5 hours at 45°).
+        let swing = (latitude.abs() / 45. * 3.4).min(6.);
+        let length = 12. + swing * (2. * summer - 1.);
+        let summer_time = latitude >= 0. && (84..=300).contains(&(day as u32));
+        let noon = 12.4 + if summer_time { 1. } else { 0. };
+        Self {
+            snow,
+            flowers: near(145., 45.),
+            autumn,
+            sunrise: noon - length / 2.,
+            sunset: noon + length / 2.,
+        }
+    }
+
+    /// `hour` mapped onto the winter keyframes: sunrise to sunrise, sunset
+    /// to sunset, day and night stretched linearly in between.
+    fn winter_hour(&self, hour: f32) -> f32 {
+        let (rise, set) = (self.sunrise, self.sunset);
+        let h = hour.rem_euclid(24.);
+        let mapped = if (rise..set).contains(&h) {
+            SUNRISE + (h - rise) / (set - rise) * (SUNSET - SUNRISE)
+        } else {
+            let night = 24. - set + rise;
+            let since = (h - set).rem_euclid(24.);
+            SUNSET + since / night * (24. - SUNSET + SUNRISE)
+        };
+        mapped.rem_euclid(24.)
+    }
+}
+
+/// The wall clock of the frame being built (the preview's `--time` too).
+pub fn set_day(now: time::OffsetDateTime) {
+    let hour =
+        f32::from(now.hour()) + f32::from(now.minute()) / 60. + f32::from(now.second()) / 3600.;
+    DAY_HOUR.store(hour.to_bits(), std::sync::atomic::Ordering::Relaxed);
+    DAY_OF_YEAR.store(
+        u32::from(now.ordinal()),
+        std::sync::atomic::Ordering::Relaxed,
+    );
+}
+
+/// The hour Winter day shows. `SERA_DAY_CYCLE=<seconds>` runs a whole day
+/// in that many seconds instead (to preview the transitions).
+fn day_hour() -> f32 {
+    static CYCLE: std::sync::OnceLock<Option<(f64, std::time::Instant)>> =
+        std::sync::OnceLock::new();
+    let cycle = CYCLE.get_or_init(|| {
+        std::env::var("SERA_DAY_CYCLE")
+            .ok()
+            .and_then(|v| v.parse::<f64>().ok())
+            .filter(|s| *s > 0.)
+            .map(|s| (s, std::time::Instant::now()))
+    });
+    match cycle {
+        Some((seconds, start)) => ((start.elapsed().as_secs_f64() / seconds).fract() * 24.) as f32,
+        None => f32::from_bits(DAY_HOUR.load(std::sync::atomic::Ordering::Relaxed)),
+    }
+}
+
+/// One moment of a winter day: sky top and horizon, the light's colour,
+/// how lit the scene is (0..1), how visible the stars are, and how much
+/// it snows (1 = the full night snowfall).
+struct Sky {
+    hour: f32,
+    top: u32,
+    horizon: u32,
+    glow: u32,
+    light: f32,
+    stars: f32,
+    snow: f32,
+}
+
+/// Winter keyframes (short days: sunrise ~7:30, sunset ~16:45).
+const DAY: [Sky; 10] = [
+    Sky {
+        hour: 0.,
+        top: 0x050a1c,
+        horizon: 0x16243f,
+        glow: 0x9db8ff,
+        light: 0.24,
+        stars: 1.,
+        snow: 1.0,
+    },
+    Sky {
+        hour: 5.75,
+        top: 0x070d24,
+        horizon: 0x1c2a4c,
+        glow: 0x9db8ff,
+        light: 0.26,
+        stars: 0.9,
+        snow: 1.0,
+    },
+    Sky {
+        hour: 7.0,
+        top: 0x1c2858,
+        horizon: 0x8a6a8e,
+        glow: 0xffa890,
+        light: 0.45,
+        stars: 0.3,
+        snow: 0.85,
+    },
+    Sky {
+        hour: 7.75,
+        top: 0x34509a,
+        horizon: 0xf0a078,
+        glow: 0xffc090,
+        light: 0.7,
+        stars: 0.,
+        snow: 0.6,
+    },
+    Sky {
+        hour: 9.5,
+        top: 0x3462aa,
+        horizon: 0x9cc0e4,
+        glow: 0xfff2dc,
+        light: 0.95,
+        stars: 0.,
+        snow: 0.35,
+    },
+    Sky {
+        hour: 14.5,
+        top: 0x2f5ea8,
+        horizon: 0xa6c4e2,
+        glow: 0xfff0d4,
+        light: 1.,
+        stars: 0.,
+        snow: 0.35,
+    },
+    Sky {
+        hour: 16.25,
+        top: 0x2c4486,
+        horizon: 0xf08a56,
+        glow: 0xffa050,
+        light: 0.72,
+        stars: 0.,
+        snow: 0.85,
+    },
+    Sky {
+        hour: 17.0,
+        top: 0x1a2054,
+        horizon: 0x8a4a6a,
+        glow: 0xe07a80,
+        light: 0.45,
+        stars: 0.3,
+        snow: 1.0,
+    },
+    Sky {
+        hour: 18.0,
+        top: 0x0a1030,
+        horizon: 0x24305a,
+        glow: 0x9db8ff,
+        light: 0.3,
+        stars: 0.85,
+        snow: 1.0,
+    },
+    Sky {
+        hour: 24.,
+        top: 0x050a1c,
+        horizon: 0x16243f,
+        glow: 0x9db8ff,
+        light: 0.24,
+        stars: 1.,
+        snow: 1.0,
+    },
+];
+const SUNRISE: f32 = 7.4;
+const SUNSET: f32 = 16.7;
+
+fn mix(a: [f32; 3], b: [f32; 3], t: f32) -> [f32; 3] {
+    [0, 1, 2].map(|i| a[i] + (b[i] - a[i]) * t)
+}
+
+/// Sky palette and shader tuning at `hour`: u_params is (light x, light y,
+/// light level, stars). The sun crosses between sunrise and sunset, the
+/// moon through the night; both set behind the mountains.
+fn daylight(hour: f32) -> (Palette, [f32; 4], f32) {
+    let hour = hour.rem_euclid(24.);
+    let next = DAY
+        .iter()
+        .position(|k| k.hour > hour)
+        .unwrap_or(DAY.len() - 1);
+    let (a, b) = (&DAY[next.saturating_sub(1)], &DAY[next]);
+    let span = (b.hour - a.hour).max(0.001);
+    let t = ((hour - a.hour) / span).clamp(0., 1.);
+    let t = t * t * (3. - 2. * t);
+    let top = mix(rgb(a.top), rgb(b.top), t);
+    let horizon = mix(rgb(a.horizon), rgb(b.horizon), t);
+    let glow = mix(rgb(a.glow), rgb(b.glow), t);
+    let light = a.light + (b.light - a.light) * t;
+    let stars = a.stars + (b.stars - a.stars) * t;
+    let snow = a.snow + (b.snow - a.snow) * t;
+    // Arc progress of the sun by day, of the moon by night.
+    let (start, length) = if (SUNRISE..SUNSET).contains(&hour) {
+        (SUNRISE, SUNSET - SUNRISE)
+    } else {
+        (SUNSET, 24. - SUNSET + SUNRISE)
+    };
+    let arc = (hour - start).rem_euclid(24.) / length;
+    let x = 0.12 + 1.54 * arc;
+    let y = 0.78 - 0.6 * (arc * std::f32::consts::PI).sin();
+    // Flakes catch the light: white by day, blue-grey at night, warm at dusk.
+    let white = [1., 1., 1.];
+    let catch = mix(mix(horizon, glow, 0.5), white, 0.35 + 0.5 * light);
+    let flakes = [0.55, 0.68, 0.82, 0.95].map(|k| mix(top, catch, k));
+    (
+        Palette {
+            base: top,
+            accent: glow,
+            colors: [flakes[0], flakes[1], flakes[2], flakes[3], horizon],
+        },
+        [x, y, light, stars],
+        snow,
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// GLSL ES 1.00 (the TV) has no implicit int-to-float conversion,
+    /// unlike desktop GL (the Mac preview): `cond ? 14.0 : 13` or
+    /// `float x = 2;` fail to compile there and the wallpaper turns black.
+    #[test]
+    fn shaders_never_mix_int_literals_into_floats() {
+        let is_int = |t: &str| !t.is_empty() && t.chars().all(|c| c.is_ascii_digit());
+        let is_float =
+            |t: &str| t.contains('.') && t.trim_start_matches('-').parse::<f32>().is_ok();
+        let sources = Style::ALL
+            .map(|s| (s.file(), s.shader()))
+            .into_iter()
+            .chain([(
+                "common.frag",
+                include_str!("shaders/procedural/common.frag"),
+            )]);
+        for (file, source) in sources {
+            for (number, line) in source.lines().enumerate() {
+                let code = line.split("//").next().unwrap_or("");
+                // `? a : b` with one float and one int literal.
+                if let Some((_, rest)) = code.split_once('?')
+                    && let Some((a, b)) = rest.split_once(':')
+                {
+                    let a = a.trim();
+                    let b = b.trim().trim_end_matches(';').trim_end_matches(')').trim();
+                    assert!(
+                        !((is_int(a) && is_float(b)) || (is_float(a) && is_int(b))),
+                        "{file}:{}: int literal in a float ternary: {line}",
+                        number + 1
+                    );
+                }
+                // `float x = 2;`
+                if let Some(rest) = code.trim().strip_prefix("float ")
+                    && let Some((_, value)) = rest.split_once('=')
+                {
+                    let value = value.trim().trim_end_matches(';').trim();
+                    assert!(
+                        !is_int(value.trim_start_matches('-')),
+                        "{file}:{}: int literal assigned to a float: {line}",
+                        number + 1
+                    );
+                }
+            }
+        }
+    }
 
     #[test]
     fn paths_round_trip() {
