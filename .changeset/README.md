@@ -11,7 +11,7 @@ for breaking changes. The comment is informational and also works on fork PRs.
 
 Merged changesets accumulate in the automated **Version Packages** PR. Its version command
 updates `package.json`, `CHANGELOG.md`, `appinfo.json`, the root `Cargo.toml`, the `sera` entry in
-`Cargo.lock`, and the versioned IPK examples in `readme.md`. Supporting Rust crates keep their
+`Cargo.lock`, and the versioned IPK examples in `README.md`. Supporting Rust crates keep their
 own versions. Do not run `pnpm version:release` in ordinary feature PRs.
 
 The version PR receives the same CI checks as other PRs. Merging it into `main` publishes the

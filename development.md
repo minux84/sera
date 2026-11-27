@@ -506,7 +506,7 @@ After changesets merge into `main`, `.github/workflows/release-pr.yml` creates o
 **Version Packages** PR on `changeset-release/main`. Changesets combines the pending notes using
 the highest requested bump. The custom `pnpm version:release` command updates `package.json`
 and `CHANGELOG.md`, then synchronizes `appinfo.json`, the root `Cargo.toml`, the `sera` entry in
-`Cargo.lock`, and the versioned IPK examples in `readme.md`. Dependency pins and supporting Rust
+`Cargo.lock`, and the versioned IPK examples in `README.md`. Dependency pins and supporting Rust
 crate versions are preserved. The package stays private and is never published to npm.
 
 The generated PR receives the same CI build as ordinary PRs. Since PRs created with GitHub's
